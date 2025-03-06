@@ -52,6 +52,10 @@ pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task])
         Color::Reset
     };
     table.add_row(vec![Cell::new("Name"), Cell::new(&project.name).fg(color)]);
+    table.add_row(vec![
+        Cell::new("Status"),
+        Cell::new(format!("{:?}", &project.state)),
+    ]);
 
     println!("{table}");
     if tasks.len() > 0 {
@@ -60,7 +64,7 @@ pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task])
 }
 
 fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
-    let headers = vec!["ID", "Entry", "Description", "Tags"];
+    let headers = vec!["ID", "Entry", "Description", "Status", "Tags"];
     let mut table = create_table(&headers);
     for (index, item) in tasks.into_iter().enumerate() {
         let bg_color = if cfg.color && index % 2 == 0 {
@@ -72,6 +76,7 @@ fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
             Cell::new(item.id.to_string()).bg(bg_color),
             Cell::new(item.entry.to_string()).bg(bg_color),
             Cell::new(item.description.to_string()).bg(bg_color),
+            Cell::new(item.status.to_string()).bg(bg_color),
             Cell::new(item.tags.clone().unwrap_or(vec![]).join(", ")).bg(bg_color),
         ]);
     }

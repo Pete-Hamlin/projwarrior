@@ -22,7 +22,7 @@ fn main() {
         match command {
             "init" => init_projects(&cfg, &tasks),
             "list" => list_projects(&cfg, &tasks, &projects),
-            "count" => count_projects(&cfg, &tasks, &projects),
+            "count" => count_projects(&cfg, &args, &tasks, &projects),
             "add" => add_project(&cfg, &args, &mut projects),
             "reset" => reset_projects(&cfg),
             _ => parse_subcommand(&cfg, &args, &tasks, &mut projects),
@@ -46,9 +46,11 @@ fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task], projects: &mut 
     }
     if let Some(subcommand) = args.subcommand.as_deref() {
         match subcommand {
-            // "done" => mark_project_done(id, projects),
-            "delete" => delete_item(cfg, id, projects),
             "show" => show_project(cfg, id, projects, tasks),
+            "done" => mark_project_done(&mut projects[id]),
+            "incubate" => mark_project_incubate(&mut projects[id]),
+            "start" => mark_project_pending(&mut projects[id]),
+            "delete" => delete_project(cfg, id, projects),
             _ => println!("Subcommand {} not found", subcommand),
         }
     } else {
@@ -64,7 +66,13 @@ fn init_projects(cfg: &GtdConfig, tasks: &[Task]) -> () {
             name_list.push(project_name);
         }
     });
-    let projects: Vec<Project> = name_list.into_iter().map(|name| Project { name }).collect();
+    let projects: Vec<Project> = name_list
+        .into_iter()
+        .map(|name| Project {
+            name,
+            ..Default::default()
+        })
+        .collect();
     match write_project_list(cfg, &projects) {
         Ok(_p) => println!("Successfully initialized new project list"),
         Err(e) => println!("Failed to write project list: {:?}", e),
@@ -75,7 +83,7 @@ fn list_projects(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
     project_list_table(cfg, tasks, &projects);
 }
 
-fn count_projects(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
+fn count_projects(cfg: &GtdConfig, _args: &Cli, tasks: &[Task], projects: &[Project]) {
     if !cfg.short {
         let count = projects.into_iter().count();
         println!("{:?}", count)
@@ -85,6 +93,21 @@ fn count_projects(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
             .filter(|p| p.get_tasks(tasks) == 0)
             .count();
         println!("{:?}", count)
+    }
+}
+
+fn add_project(cfg: &GtdConfig, args: &Cli, projects: &mut Vec<Project>) -> () {
+    if let Some(subcommand) = args.subcommand.as_deref() {
+        projects.push(Project {
+            name: subcommand.to_string(),
+            ..Default::default()
+        });
+        match write_project_list(cfg, projects) {
+            Ok(_p) => println!("Successfully processed project"),
+            Err(e) => println!("Failed to add project {:?}", e),
+        }
+    } else {
+        println!("No task specified - run `proj --help` for guidance on running this command")
     }
 }
 
@@ -107,23 +130,22 @@ fn show_project(cfg: &GtdConfig, project_id: usize, projects: &[Project], tasks:
     project_details_table(cfg, project, &project_tasks);
 }
 
-fn add_project(cfg: &GtdConfig, args: &Cli, projects: &mut Vec<Project>) -> () {
-    if let Some(subcommand) = args.subcommand.as_deref() {
-        projects.push(Project {
-            name: subcommand.to_string(),
-        });
-        match write_project_list(cfg, projects) {
-            Ok(_p) => println!("Successfully processed project"),
-            Err(e) => println!("Failed to add project {:?}", e),
-        }
-    } else {
-        println!("No task specified - run `proj --help` for guidance on running this command")
-    }
+fn mark_project_done(project: &mut Project) -> () {
+    project.mark_complete();
+    println!("Marked project {:?} as done!", project.name)
 }
 
-// fn mark_project_done(proj_id: usize, projects: &mut Vec<Project>) -> () {}
+fn mark_project_incubate(project: &mut Project) -> () {
+    project.mark_incubate();
+    println!("incubated project {:?}!", project.name)
+}
 
-fn delete_item(cfg: &GtdConfig, proj_id: usize, projects: &mut Vec<Project>) -> () {
+fn mark_project_pending(project: &mut Project) -> () {
+    project.mark_pending();
+    println!("Marked project {:?} as pending!", project.name)
+}
+
+fn delete_project(cfg: &GtdConfig, proj_id: usize, projects: &mut Vec<Project>) -> () {
     match remove_project_item(cfg, proj_id, projects) {
         Ok(p) => println!("Successfully removed project {:?}", p),
         Err(e) => println!("Failed to remove project {:?}", e),

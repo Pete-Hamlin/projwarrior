@@ -1,3 +1,4 @@
+use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
@@ -5,11 +6,29 @@ use std::fs::File;
 use crate::config::GtdConfig;
 use crate::parser::Task;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub enum State {
+    #[default]
+    Pending,
+    Complete,
+    Incubate,
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            State::Pending => write!(f, "Pending"),
+            State::Complete => write!(f, "Complete"),
+            State::Incubate => write!(f, "Incubate"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub name: String,
-    // tags: Option<Vec<String>>,
+    pub state: State,
 }
 
 impl Project {
@@ -19,6 +38,18 @@ impl Project {
             .filter(|t| t.project.clone().unwrap_or_default() == self.name)
             .count();
         return count as i32;
+    }
+
+    pub fn mark_complete(&mut self) {
+        self.state = State::Complete;
+    }
+
+    pub fn mark_pending(&mut self) {
+        self.state = State::Pending;
+    }
+
+    pub fn mark_incubate(&mut self) {
+        self.state = State::Incubate;
     }
 }
 
