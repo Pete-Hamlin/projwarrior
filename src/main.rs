@@ -1,18 +1,16 @@
 #![recursion_limit = "1024"]
-use std::error::Error;
-
 mod config;
 mod parser;
 mod project;
 mod table;
 
-use config::{get_config, Cli, GtdConfig};
-use parser::{get_task_list, Task};
-use project::{generate_project_list, get_projects, write_project_list, Project};
-use table::{project_details_table, project_list_table};
-
 use clap::Parser;
+use config::{Cli, GtdConfig, get_config};
+use parser::{Task, get_task_list};
+use project::{Project, get_projects, write_project_list};
+use std::error::Error;
 use std::fs::remove_file;
+use table::{project_details_table, project_list_table};
 
 fn main() {
     let args = Cli::parse();
@@ -82,9 +80,9 @@ fn count_projects(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
         let count = projects.into_iter().count();
         println!("{:?}", count)
     } else {
-        let count = generate_project_list(tasks, projects)
+        let count = projects
             .into_iter()
-            .filter(|p| p.tasks == 0)
+            .filter(|p| p.get_tasks(tasks) == 0)
             .count();
         println!("{:?}", count)
     }
