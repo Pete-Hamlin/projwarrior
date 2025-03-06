@@ -34,7 +34,7 @@ impl ::std::default::Default for GtdConfig {
         Self {
             task_path: get_task_bin(),
             storage_path: env::var("HOME").unwrap() + "/.task/projects.data",
-            short: true,
+            short: false,
             color: true,
         }
     }
