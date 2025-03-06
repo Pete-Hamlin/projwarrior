@@ -53,8 +53,8 @@ pub fn get_config(args: &Cli) -> GtdConfig {
     let cfg: GtdConfig = confy::load("projwarrior", None).expect("Failed to load config");
     // Overwrite config file with CLI options
     return GtdConfig {
-        short: args.short,
-        color: args.color,
+        short: if args.short { true } else { cfg.short },
+        color: if args.color { true } else { cfg.color },
         ..cfg
     };
 }
