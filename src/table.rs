@@ -40,7 +40,9 @@ pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project])
             ]);
         }
     }
-    println!("{table}");
+    if table.row_count() > 0 {
+        println!("{table}");
+    }
 }
 
 pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task]) {

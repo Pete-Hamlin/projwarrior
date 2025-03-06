@@ -137,7 +137,7 @@ fn mark_project_done(project: &mut Project) -> () {
 
 fn mark_project_incubate(project: &mut Project) -> () {
     project.mark_incubate();
-    println!("incubated project {:?}!", project.name)
+    println!("Incubated project {:?}!", project.name)
 }
 
 fn mark_project_pending(project: &mut Project) -> () {
