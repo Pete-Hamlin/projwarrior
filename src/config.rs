@@ -33,7 +33,7 @@ impl ::std::default::Default for GtdConfig {
     fn default() -> Self {
         Self {
             task_path: get_task_bin(),
-            storage_path: env::var("HOME").unwrap() + "/.task/projects.data",
+            storage_path: env::var("HOME").unwrap() + "/.local/share/projwarrior/projects.json",
             short: false,
             color: true,
         }
