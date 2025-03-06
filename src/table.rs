@@ -1,8 +1,17 @@
 use comfy_table::presets::NOTHING;
 use comfy_table::{Attribute, Cell, Color, Table};
+use serde::{Deserialize, Serialize};
 
-use crate::project::{generate_project_list, Project};
+use crate::project::Project;
 use crate::{config::GtdConfig, parser::Task};
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTableItem {
+    pub index: usize,
+    pub name: String,
+    pub tasks: i32,
+}
 
 pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
     let headers = vec!["ID", "Name", "Tasks"];
@@ -67,6 +76,28 @@ fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
         ]);
     }
     println!("{table}");
+}
+
+/// Converts the imported JSON `Project` struct to a `ProjectListItem` (the data we wish to display).
+/// Currently attaches the following data:
+/// - Current pending task count
+///
+/// * `tasks`: Parsed task list JSON
+/// * `projects`: Parsed project list JSON
+pub fn generate_project_list(tasks: &[Task], projects: &[Project]) -> Vec<ProjectTableItem> {
+    let result: Vec<ProjectTableItem> = projects
+        .iter()
+        .enumerate()
+        .map(|(index, project)| {
+            let count = project.get_tasks(tasks);
+            return ProjectTableItem {
+                index,
+                name: project.name.clone(),
+                tasks: count,
+            };
+        })
+        .collect();
+    return result;
 }
 
 fn create_table(headers: &[&str]) -> Table {
