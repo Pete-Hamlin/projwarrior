@@ -33,7 +33,7 @@ impl ::std::default::Default for GtdConfig {
     fn default() -> Self {
         Self {
             task_path: get_task_bin(),
-            storage_path: env::var("HOME").unwrap() + "/.local/share/projwarrior/projects.json",
+            storage_path: env::var("HOME").unwrap() + "/.local/share/projwarrior/projects.sqlite",
             short: false,
             color: true,
         }
@@ -58,52 +58,3 @@ pub fn get_config(args: &Cli) -> GtdConfig {
         ..cfg
     };
 }
-
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//    use std::env;
-//    use std::fs;
-//
-//    #[test]
-//    fn test_get_task_bin() {
-//        // Create a temporary directory and add a fake `task` binary
-//        let temp_dir = tempfile::tempdir().unwrap();
-//        let task_path = temp_dir.path().join("task");
-//        fs::write(&task_path, "#!/bin/sh\necho task").unwrap();
-//        env::set_var("PATH", temp_dir.path());
-//
-//        // Call the function and check the result
-//        let result = get_task_bin();
-//        assert!(result.contains("task"));
-//    }
-//
-//    #[test]
-//    fn test_get_config_default() {
-//        // Create a default CLI struct
-//        let args = Cli {
-//            command: None,
-//            subcommand: None,
-//            short: false,
-//        };
-//
-//        // Call the function and check the result
-//        let config = get_config(&args);
-//        assert_eq!(config.short, false);
-//        assert!(config.storage_path.contains("/.task/projects.data"));
-//    }
-//
-//    #[test]
-//    fn test_get_config_with_args() {
-//        // Create a CLI struct with short option set to true
-//        let args = Cli {
-//            command: None,
-//            subcommand: None,
-//            short: true,
-//        };
-//
-//        // Call the function and check the result
-//        let config = get_config(&args);
-//        assert_eq!(config.short, true);
-//    }
-//}

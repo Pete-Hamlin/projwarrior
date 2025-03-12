@@ -1,13 +1,15 @@
 #![recursion_limit = "1024"]
 mod config;
+mod db;
 mod parser;
 mod project;
 mod table;
 
 use clap::Parser;
 use config::{Cli, GtdConfig, get_config};
+use db::{check_db, get_projects, insert_projects};
 use parser::{Task, get_task_list};
-use project::{Project, get_projects, write_project_list};
+use project::{Project, write_project_list};
 use std::error::Error;
 use std::fs::remove_file;
 use table::{project_details_table, project_list_table};
@@ -15,8 +17,12 @@ use table::{project_details_table, project_list_table};
 fn main() {
     let args = Cli::parse();
     let cfg = get_config(&args);
+    match check_db(&cfg) {
+        Ok(_) => (),
+        Err(error) => println!("Error connecting to the database: {:?}", error),
+    };
     let tasks = get_task_list(&cfg).expect("Failed to get task list");
-    let mut projects = get_projects(&cfg).expect("Failed to retrieve project list");
+    let mut projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
 
     if let Some(command) = args.command.as_deref() {
         match command {
@@ -73,7 +79,7 @@ fn init_projects(cfg: &GtdConfig, tasks: &[Task]) -> () {
             ..Default::default()
         })
         .collect();
-    match write_project_list(cfg, &projects) {
+    match insert_projects(cfg, &projects) {
         Ok(_p) => println!("Successfully initialized new project list"),
         Err(e) => println!("Failed to write project list: {:?}", e),
     }
@@ -112,11 +118,9 @@ fn add_project(cfg: &GtdConfig, args: &Cli, projects: &mut Vec<Project>) -> () {
 }
 
 fn reset_projects(cfg: &GtdConfig) {
-    remove_file(&cfg.storage_path).expect("Error removing config file.");
-    let projects: Vec<Project> = vec![];
-    match write_project_list(cfg, &projects) {
-        Ok(_p) => println!("Successfully reset project list"),
-        Err(e) => println!("Failed to write project list: {:?}", e),
+    match remove_file(&cfg.storage_path) {
+        Ok(_p) => println!("Successfully removed project list"),
+        Err(e) => println!("Failed to remove project list: {:?}", e),
     }
 }
 
