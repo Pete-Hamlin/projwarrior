@@ -13,6 +13,7 @@ use project::{Project, write_project_list};
 use std::error::Error;
 use std::fs::remove_file;
 use table::{project_details_table, project_list_table};
+use uuid::Uuid;
 
 fn main() {
     let args = Cli::parse();
@@ -76,6 +77,7 @@ fn init_projects(cfg: &GtdConfig, tasks: &[Task]) -> () {
         .into_iter()
         .map(|name| Project {
             name,
+            uuid: Uuid::new_v4(),
             ..Default::default()
         })
         .collect();
