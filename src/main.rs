@@ -7,7 +7,7 @@ mod table;
 
 use clap::Parser;
 use config::{Cli, GtdConfig, get_config};
-use db::{check_db, get_projects, insert_projects};
+use db::{check_db, get_projects, insert_project, insert_projects};
 use parser::{Task, get_task_list};
 use project::{Project, write_project_list};
 use std::error::Error;
@@ -23,19 +23,18 @@ fn main() {
         Err(error) => println!("Error connecting to the database: {:?}", error),
     };
     let tasks = get_task_list(&cfg).expect("Failed to get task list");
-    let mut projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
 
     if let Some(command) = args.command.as_deref() {
         match command {
             "init" => init_projects(&cfg, &tasks),
-            "list" => list_projects(&cfg, &tasks, &projects),
-            "count" => count_projects(&cfg, &args, &tasks, &projects),
-            "add" => add_project(&cfg, &args, &mut projects),
+            "list" => list_projects(&cfg, &tasks),
+            "count" => count_projects(&cfg, &args, &tasks),
+            "add" => add_project(&cfg, &args),
             "reset" => reset_projects(&cfg),
             _ => parse_subcommand(&cfg, &args, &tasks, &mut projects),
         }
     } else {
-        list_projects(&cfg, &tasks, &projects)
+        list_projects(&cfg, &tasks)
     }
 }
 
@@ -87,11 +86,13 @@ fn init_projects(cfg: &GtdConfig, tasks: &[Task]) -> () {
     }
 }
 
-fn list_projects(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
+fn list_projects(cfg: &GtdConfig, tasks: &[Task]) {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
     project_list_table(cfg, tasks, &projects);
 }
 
-fn count_projects(cfg: &GtdConfig, _args: &Cli, tasks: &[Task], projects: &[Project]) {
+fn count_projects(cfg: &GtdConfig, _args: &Cli, tasks: &[Task]) {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
     if !cfg.short {
         let count = projects.into_iter().count();
         println!("{:?}", count)
@@ -104,13 +105,14 @@ fn count_projects(cfg: &GtdConfig, _args: &Cli, tasks: &[Task], projects: &[Proj
     }
 }
 
-fn add_project(cfg: &GtdConfig, args: &Cli, projects: &mut Vec<Project>) -> () {
+fn add_project(cfg: &GtdConfig, args: &Cli) -> () {
     if let Some(subcommand) = args.subcommand.as_deref() {
-        projects.push(Project {
+        let project = vec![Project {
             name: subcommand.to_string(),
+            uuid: Uuid::new_v4(),
             ..Default::default()
-        });
-        match write_project_list(cfg, projects) {
+        }];
+        match insert_projects(cfg, &project) {
             Ok(_p) => println!("Successfully processed project"),
             Err(e) => println!("Failed to add project {:?}", e),
         }
