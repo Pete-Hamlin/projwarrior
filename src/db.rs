@@ -20,6 +20,9 @@ pub fn check_db(cfg: &GtdConfig) -> Result<()> {
     Ok(())
 }
 
+/// Sets up initial database tables
+///
+/// * `conn`: rusqlite database connection
 fn init_db(conn: &Connection) -> Result<()> {
     println!("Initializing projects db...");
     conn.execute(
@@ -29,18 +32,6 @@ fn init_db(conn: &Connection) -> Result<()> {
             state TEXT NOT NULL
         )",
         [],
-    )?;
-    Ok(())
-}
-
-pub fn insert_project(conn: &Connection, project: &Project) -> Result<()> {
-    conn.execute(
-        "INSERT INTO project (uuid, name, state) VALUES (?1, ?2, ?3, )",
-        params![
-            project.uuid.to_string(),
-            project.name,
-            project.state.to_string()
-        ],
     )?;
     Ok(())
 }
@@ -86,7 +77,7 @@ pub fn get_projects(
         let uuid_str: String = row.get(0)?;
         id += 1;
         Ok(Project {
-            id: id,
+            id,
             uuid: Uuid::parse_str(&uuid_str).unwrap(),
             name: row.get(1)?,
             state: row.get(2)?,
