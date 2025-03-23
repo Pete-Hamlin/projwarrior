@@ -1,7 +1,9 @@
 use core::fmt;
+use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::File;
+use uuid::Uuid;
 
 use crate::config::GtdConfig;
 use crate::parser::Task;
@@ -24,11 +26,30 @@ impl fmt::Display for State {
     }
 }
 
+impl ToSql for State {
+    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error> {
+        Ok(ToSqlOutput::from(self.to_string()))
+    }
+}
+
+impl FromSql for State {
+    fn column_result(value: ValueRef) -> Result<Self, FromSqlError> {
+        match value.as_str()? {
+            "Pending" => Ok(State::Pending),
+            "Complete" => Ok(State::Complete),
+            "Incubate" => Ok(State::Incubate),
+            _ => Err(FromSqlError::InvalidType),
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub name: String,
     pub state: State,
+    pub id: u32,
+    pub uuid: Uuid,
 }
 
 impl Project {
