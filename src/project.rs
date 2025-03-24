@@ -1,11 +1,8 @@
 use core::fmt;
 use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fs::File;
 use uuid::Uuid;
 
-use crate::config::GtdConfig;
 use crate::parser::Task;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -60,31 +57,4 @@ impl Project {
             .count();
         return count as i32;
     }
-
-    pub fn mark_complete(&mut self) {
-        self.state = State::Complete;
-    }
-
-    pub fn mark_pending(&mut self) {
-        self.state = State::Pending;
-    }
-
-    pub fn mark_incubate(&mut self) {
-        self.state = State::Incubate;
-    }
-}
-
-pub fn get_projects(cfg: &GtdConfig) -> Result<Vec<Project>, Box<dyn Error>> {
-    let file = File::open(&cfg.storage_path)
-        .expect("Project storage file not found - Check your config location");
-    let projects: Vec<Project> = match serde_json::from_reader(file) {
-        Ok(projects) => projects,
-        Err(_) => vec![],
-    };
-    Ok(projects)
-}
-
-pub fn write_project_list(cfg: &GtdConfig, projects: &[Project]) -> Result<(), Box<dyn Error>> {
-    serde_json::to_writer(&File::create(&cfg.storage_path)?, &projects)?;
-    Ok(())
 }

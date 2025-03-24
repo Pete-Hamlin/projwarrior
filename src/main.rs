@@ -7,10 +7,10 @@ mod table;
 
 use clap::Parser;
 use config::{Cli, GtdConfig, get_config};
-use db::{check_db, get_projects, insert_project, insert_projects};
+use db::{check_db, delete_project, get_projects, insert_projects, update_project_status};
 use parser::{Task, get_task_list};
-use project::{Project, write_project_list};
-use std::error::Error;
+use project::{Project, State};
+use std::usize;
 use std::fs::remove_file;
 use table::{project_details_table, project_list_table};
 use uuid::Uuid;
@@ -31,15 +31,16 @@ fn main() {
             "count" => count_projects(&cfg, &args, &tasks),
             "add" => add_project(&cfg, &args),
             "reset" => reset_projects(&cfg),
-            _ => parse_subcommand(&cfg, &args, &tasks, &mut projects),
+            _ => parse_subcommand(&cfg, &args, &tasks),
         }
     } else {
         list_projects(&cfg, &tasks)
     }
 }
 
-fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task], projects: &mut Vec<Project>) {
+fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task]) {
     // If we have subcommands, command should be a project ID, which is an an integer
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
     let id: usize = args
         .command
         .clone()
@@ -52,15 +53,15 @@ fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task], projects: &mut 
     }
     if let Some(subcommand) = args.subcommand.as_deref() {
         match subcommand {
-            "show" => show_project(cfg, id, projects, tasks),
-            "done" => mark_project_done(&mut projects[id]),
-            "incubate" => mark_project_incubate(&mut projects[id]),
-            "start" => mark_project_pending(&mut projects[id]),
-            "delete" => delete_project(cfg, id, projects),
-            _ => println!("Subcommand {} not found", subcommand),
+            "show" => show_project(cfg, id, tasks),
+            "done" => mark_project_done(cfg, id),
+            "incubate" => mark_project_incubate(cfg, id),
+            "start" => mark_project_pending(cfg, id),
+            "delete" => delete_project_item(cfg, id),
+            _ => println!("Subcommand {subcommand} not found"),
         }
     } else {
-        show_project(cfg, id, projects, tasks);
+        show_project(cfg, id, tasks);
     }
 }
 
@@ -128,7 +129,8 @@ fn reset_projects(cfg: &GtdConfig) {
     }
 }
 
-fn show_project(cfg: &GtdConfig, project_id: usize, projects: &[Project], tasks: &[Task]) {
+fn show_project(cfg: &GtdConfig, project_id: usize, tasks: &[Task]) {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
     let project = &projects[project_id];
     let project_tasks: Vec<Task> = tasks
         .iter()
@@ -138,34 +140,38 @@ fn show_project(cfg: &GtdConfig, project_id: usize, projects: &[Project], tasks:
     project_details_table(cfg, project, &project_tasks);
 }
 
-fn mark_project_done(project: &mut Project) -> () {
-    project.mark_complete();
-    println!("Marked project {:?} as done!", project.name)
+fn mark_project_done(cfg: &GtdConfig, project_id: usize) -> () {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
+    let project = projects.get(project_id).unwrap();
+    match update_project_status(cfg, &State::Complete, &project.uuid) {
+        Ok(_) => println!("Marked project {:?} as done!", project.name),
+        Err(e) => println!("Unable to process project, error: {e:?}")
+    };
 }
 
-fn mark_project_incubate(project: &mut Project) -> () {
-    project.mark_incubate();
-    println!("Incubated project {:?}!", project.name)
+fn mark_project_incubate(cfg: &GtdConfig, project_id: usize) -> () {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
+    let project = projects.get(project_id).unwrap();
+    match update_project_status(cfg, &State::Incubate, &project.uuid) {
+        Ok(_) => println!("Incubated project {:?}!", project.name),
+        Err(e) => println!("Unable to process project, error: {e:?}")
+    };
 }
 
-fn mark_project_pending(project: &mut Project) -> () {
-    project.mark_pending();
-    println!("Marked project {:?} as pending!", project.name)
+fn mark_project_pending(cfg: &GtdConfig, project_id: usize) -> () {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
+    let project = projects.get(project_id).unwrap();
+    match update_project_status(cfg, &State::Pending, &project.uuid) {
+        Ok(_) => println!("Marked project {:?} as pending!", project.name),
+        Err(e) => println!("Unable to process project, error: {e:?}")
+    };
 }
 
-fn delete_project(cfg: &GtdConfig, proj_id: usize, projects: &mut Vec<Project>) -> () {
-    match remove_project_item(cfg, proj_id, projects) {
+fn delete_project_item(cfg: &GtdConfig, proj_id: usize) -> () {
+    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
+    let project = projects.get(proj_id).unwrap();
+    match delete_project(cfg, &project.uuid) {
         Ok(p) => println!("Successfully removed project {:?}", p),
         Err(e) => println!("Failed to remove project {:?}", e),
     }
-}
-
-fn remove_project_item(
-    cfg: &GtdConfig,
-    project_id: usize,
-    projects: &mut Vec<Project>,
-) -> Result<String, Box<dyn Error>> {
-    let project = projects.remove(project_id);
-    write_project_list(cfg, projects)?;
-    Ok(project.name)
 }
