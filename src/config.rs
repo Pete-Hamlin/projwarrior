@@ -11,6 +11,10 @@ pub struct Cli {
     /// Optional subcommand to work on
     pub subcommand: Option<String>,
 
+    /// Display all projects (Override config)
+    #[clap(short, long)]
+    pub long: bool,
+
     /// Display only projects without tasks
     #[clap(short, long)]
     pub short: bool,
@@ -53,7 +57,11 @@ pub fn get_config(args: &Cli) -> GtdConfig {
     let cfg: GtdConfig = confy::load("projwarrior", None).expect("Failed to load config");
     // Overwrite config file with CLI options
     return GtdConfig {
-        short: if args.short { true } else { cfg.short },
+        short: if args.short || args.long {
+            !args.long
+        } else {
+            cfg.short
+        },
         color: if args.color { true } else { cfg.color },
         ..cfg
     };
