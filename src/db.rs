@@ -55,13 +55,19 @@ pub fn insert_projects(cfg: &GtdConfig, projects: &[Project]) -> Result<()> {
 
 pub fn update_project_status(cfg: &GtdConfig, state: &State, project_id: &Uuid) -> Result<()> {
     let conn = Connection::open(&cfg.storage_path)?;
-    conn.execute("UPDATE project SET state = ?1 WHERE uuid = ?2", params![state.to_string(), project_id.to_string()]);
+    conn.execute(
+        "UPDATE project SET state = ?1 WHERE uuid = ?2",
+        params![state.to_string(), project_id.to_string()],
+    )?;
     Ok(())
 }
 
 pub fn delete_project(cfg: &GtdConfig, project_id: &Uuid) -> Result<()> {
     let conn = Connection::open(&cfg.storage_path)?;
-    conn.execute("DELETE FROM project WHERE uuid = ?1", params![project_id.to_string()]);
+    conn.execute(
+        "DELETE FROM project WHERE uuid = ?1",
+        params![project_id.to_string()],
+    )?;
     Ok(())
 }
 
