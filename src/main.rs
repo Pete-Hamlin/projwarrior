@@ -10,8 +10,8 @@ use config::{Cli, GtdConfig, get_config};
 use db::{check_db, delete_project, get_projects, insert_projects, update_project_status};
 use parser::{Task, get_task_list};
 use project::{Project, State};
-use std::usize;
 use std::fs::remove_file;
+use std::usize;
 use table::{project_details_table, project_list_table};
 use uuid::Uuid;
 
@@ -22,23 +22,21 @@ fn main() {
         Ok(_) => (),
         Err(error) => println!("Error connecting to the database: {:?}", error),
     };
-    let tasks = get_task_list(&cfg).expect("Failed to get task list");
-
     if let Some(command) = args.command.as_deref() {
         match command {
-            "init" => init_projects(&cfg, &tasks),
-            "list" => list_projects(&cfg, &tasks),
-            "count" => count_projects(&cfg, &args, &tasks),
+            "init" => init_projects(&cfg),
+            "list" => list_projects(&cfg, &args),
+            "count" => count_projects(&cfg, &args),
             "add" => add_project(&cfg, &args),
             "reset" => reset_projects(&cfg),
-            _ => parse_subcommand(&cfg, &args, &tasks),
+            _ => parse_subcommand(&cfg, &args),
         }
     } else {
-        list_projects(&cfg, &tasks)
+        list_projects(&cfg, &args)
     }
 }
 
-fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task]) {
+fn parse_subcommand(cfg: &GtdConfig, args: &Cli) {
     // If we have subcommands, command should be a project ID, which is an an integer
     let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
     let id: usize = args
@@ -53,7 +51,7 @@ fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task]) {
     }
     if let Some(subcommand) = args.subcommand.as_deref() {
         match subcommand {
-            "show" => show_project(cfg, id, tasks),
+            "show" => show_project(cfg, id),
             "done" => mark_project_done(cfg, id),
             "incubate" => mark_project_incubate(cfg, id),
             "start" => mark_project_pending(cfg, id),
@@ -61,11 +59,12 @@ fn parse_subcommand(cfg: &GtdConfig, args: &Cli, tasks: &[Task]) {
             _ => println!("Subcommand {subcommand} not found"),
         }
     } else {
-        show_project(cfg, id, tasks);
+        show_project(cfg, id);
     }
 }
 
-fn init_projects(cfg: &GtdConfig, tasks: &[Task]) -> () {
+fn init_projects(cfg: &GtdConfig) -> () {
+    let tasks = get_task_list(&cfg).expect("Failed to get task list");
     let mut name_list: Vec<String> = vec![];
     tasks.into_iter().for_each(|task| {
         let project_name = task.project.clone().unwrap();
@@ -87,20 +86,35 @@ fn init_projects(cfg: &GtdConfig, tasks: &[Task]) -> () {
     }
 }
 
-fn list_projects(cfg: &GtdConfig, tasks: &[Task]) {
-    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
-    project_list_table(cfg, tasks, &projects);
+fn list_projects(cfg: &GtdConfig, args: &Cli) {
+    let tasks = get_task_list(&cfg).expect("Failed to get task list");
+    let filter = match args.subcommand.as_deref() {
+        Some("all") => None,
+        Some("incubate") => Some(&State::Incubate),
+        Some("done") => Some(&State::Complete),
+        _ => Some(&State::Pending),
+    };
+    let projects = get_projects(&cfg, filter, None).expect("Failed to retrieve project list");
+    project_list_table(cfg, &tasks, &projects);
 }
 
-fn count_projects(cfg: &GtdConfig, _args: &Cli, tasks: &[Task]) {
-    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
+fn count_projects(cfg: &GtdConfig, args: &Cli) {
+    let tasks = get_task_list(&cfg).expect("Failed to get task list");
+    let filter = match args.subcommand.as_deref() {
+        Some("all") => None,
+        Some("incubate") => Some(&State::Incubate),
+        Some("done") => Some(&State::Complete),
+        _ => Some(&State::Pending),
+    };
+    let projects = get_projects(&cfg, filter, None).expect("Failed to retrieve project list");
+
     if !cfg.short {
         let count = projects.into_iter().count();
         println!("{:?}", count)
     } else {
         let count = projects
             .into_iter()
-            .filter(|p| p.get_tasks(tasks) == 0)
+            .filter(|p| p.get_tasks(&tasks) == 0)
             .count();
         println!("{:?}", count)
     }
@@ -129,8 +143,9 @@ fn reset_projects(cfg: &GtdConfig) {
     }
 }
 
-fn show_project(cfg: &GtdConfig, project_id: usize, tasks: &[Task]) {
+fn show_project(cfg: &GtdConfig, project_id: usize) {
     let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
+    let tasks = get_task_list(&cfg).expect("Failed to get task list");
     let project = &projects[project_id];
     let project_tasks: Vec<Task> = tasks
         .iter()
@@ -145,7 +160,7 @@ fn mark_project_done(cfg: &GtdConfig, project_id: usize) -> () {
     let project = projects.get(project_id).unwrap();
     match update_project_status(cfg, &State::Complete, &project.uuid) {
         Ok(_) => println!("Marked project {:?} as done!", project.name),
-        Err(e) => println!("Unable to process project, error: {e:?}")
+        Err(e) => println!("Unable to process project, error: {e:?}"),
     };
 }
 
@@ -154,7 +169,7 @@ fn mark_project_incubate(cfg: &GtdConfig, project_id: usize) -> () {
     let project = projects.get(project_id).unwrap();
     match update_project_status(cfg, &State::Incubate, &project.uuid) {
         Ok(_) => println!("Incubated project {:?}!", project.name),
-        Err(e) => println!("Unable to process project, error: {e:?}")
+        Err(e) => println!("Unable to process project, error: {e:?}"),
     };
 }
 
@@ -163,7 +178,7 @@ fn mark_project_pending(cfg: &GtdConfig, project_id: usize) -> () {
     let project = projects.get(project_id).unwrap();
     match update_project_status(cfg, &State::Pending, &project.uuid) {
         Ok(_) => println!("Marked project {:?} as pending!", project.name),
-        Err(e) => println!("Unable to process project, error: {e:?}")
+        Err(e) => println!("Unable to process project, error: {e:?}"),
     };
 }
 
