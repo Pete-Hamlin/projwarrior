@@ -3,7 +3,7 @@ use comfy_table::{Attribute, Cell, Color, Table};
 use serde::{Deserialize, Serialize};
 
 use crate::project::Project;
-use crate::{config::GtdConfig, parser::Task};
+use crate::{config::GtdConfig, tasks::Task};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

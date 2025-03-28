@@ -3,7 +3,7 @@ use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::parser::Task;
+use crate::tasks::Task;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub enum State {

@@ -1,14 +1,14 @@
 #![recursion_limit = "1024"]
 mod config;
 mod db;
-mod parser;
+mod tasks;
 mod project;
 mod table;
 
 use clap::Parser;
 use config::{Cli, GtdConfig, get_config};
 use db::{check_db, delete_project, get_projects, insert_projects, update_project_status};
-use parser::{Task, get_task_list};
+use tasks::{Task, get_task_list};
 use project::{Project, State};
 use std::fs::remove_file;
 use std::usize;
