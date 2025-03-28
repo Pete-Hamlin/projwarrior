@@ -49,7 +49,10 @@ fn get_task_bin() -> String {
     let task_bin = Command::new("which").arg("task").output().expect(
         "Failed to find task binary - please ensure the `task` command is available in your $PATH",
     );
-    return String::from_utf8(task_bin.stdout).unwrap();
+    return String::from_utf8(task_bin.stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
 }
 
 pub fn get_config(args: &Cli) -> GtdConfig {
