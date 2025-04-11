@@ -1,9 +1,8 @@
 use core::fmt;
 use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
+use task_hookrs::task::Task;
 use uuid::Uuid;
-
-use crate::tasks::Task;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub enum State {
@@ -53,7 +52,7 @@ impl Project {
     pub fn get_tasks(&self, tasks: &[Task]) -> i32 {
         let count = tasks
             .into_iter()
-            .filter(|t| t.project.clone().unwrap_or_default() == self.name)
+            .filter(|t| t.project().as_deref() == Some(&self.name))
             .count();
         return count as i32;
     }

@@ -1,18 +1,19 @@
 #![recursion_limit = "1024"]
 mod config;
 mod db;
-mod tasks;
 mod project;
 mod table;
+mod tasks;
 
 use clap::Parser;
 use config::{Cli, GtdConfig, get_config};
 use db::{check_db, delete_project, get_projects, insert_projects, update_project_status};
-use tasks::{Task, get_task_list};
 use project::{Project, State};
 use std::fs::remove_file;
 use std::usize;
 use table::{project_details_table, project_list_table};
+use task_hookrs::task::Task;
+use tasks::get_task_list;
 use uuid::Uuid;
 
 fn main() {
@@ -68,9 +69,9 @@ fn init_projects(cfg: &GtdConfig) -> () {
     let tasks = get_task_list(&cfg).expect("Failed to get task list");
     let mut name_list: Vec<String> = vec![];
     tasks.into_iter().for_each(|task| {
-        let project_name = task.project.clone().unwrap();
+        let project_name = task.project().unwrap();
         if !name_list.contains(&project_name) {
-            name_list.push(project_name);
+            name_list.push(project_name.clone());
         }
     });
     let projects: Vec<Project> = name_list
@@ -150,7 +151,7 @@ fn show_project(cfg: &GtdConfig, project_id: usize) {
     let project = &projects[project_id];
     let project_tasks: Vec<Task> = tasks
         .iter()
-        .filter(|t| t.project.as_deref() == Some(&project.name))
+        .filter(|t| t.project() == Some(&project.name))
         .cloned()
         .collect();
     project_details_table(cfg, project, &project_tasks);
@@ -187,7 +188,7 @@ fn delete_project_item(cfg: &GtdConfig, proj_id: usize) -> () {
     let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
     let project = projects.get(proj_id).unwrap();
     match delete_project(cfg, &project.uuid) {
-        Ok(p) => println!("Successfully removed project {:?}", p),
-        Err(e) => println!("Failed to remove project {:?}", e),
+        Ok(_) => println!("Successfully removed project {:?}", project.name),
+        Err(_) => println!("Failed to remove project {:?}", project.name),
     }
 }

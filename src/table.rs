@@ -1,9 +1,10 @@
 use comfy_table::presets::NOTHING;
 use comfy_table::{Attribute, Cell, Color, Table};
 use serde::{Deserialize, Serialize};
+use task_hookrs::task::Task;
 
+use crate::config::GtdConfig;
 use crate::project::Project;
-use crate::{config::GtdConfig, tasks::Task};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,12 +75,16 @@ fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
         } else {
             Color::Reset
         };
+        let tags: String = match item.tags() {
+            Some(tag_vec) => tag_vec.join(", "),
+            None => "".to_string(),
+        };
         table.add_row(vec![
-            Cell::new(item.id.to_string()).bg(bg_color),
-            Cell::new(item.entry.to_string()).bg(bg_color),
-            Cell::new(item.description.to_string()).bg(bg_color),
-            Cell::new(item.status.to_string()).bg(bg_color),
-            Cell::new(item.tags.clone().unwrap_or(vec![]).join(", ")).bg(bg_color),
+            Cell::new(item.id().unwrap_or(0)).bg(bg_color),
+            Cell::new(item.entry().to_string()).bg(bg_color),
+            Cell::new(item.description()).bg(bg_color),
+            Cell::new(item.status().to_string()).bg(bg_color),
+            Cell::new(tags).bg(bg_color),
         ]);
     }
     println!("{table}");
