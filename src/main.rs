@@ -45,8 +45,7 @@ fn parse_subcommand(cfg: &GtdConfig, args: &Cli) {
         .clone()
         .expect("ID incorrect format, check gtd --help for correct syntax")
         .parse::<usize>()
-        .unwrap()
-        + 1;
+        .unwrap();
     if id >= projects.len() {
         println!("No project found with ID {:?}", id.to_string());
         return;

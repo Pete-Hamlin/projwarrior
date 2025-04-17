@@ -90,12 +90,19 @@ pub fn get_projects(
     }
 
     let mut stmt = conn.prepare(&query)?;
-    let mut id = 0;
+    let mut id = 1;
     let project_iter = stmt.query_map(params.as_slice(), |row| {
         let uuid_str: String = row.get(0)?;
-        id += 1;
+        let state: State = row.get(2)?;
+        let task_id = match state {
+            State::Pending => id,
+            _ => 0,
+        };
+        if task_id != 0 {
+            id += 1;
+        }
         Ok(Project {
-            id,
+            id: task_id,
             uuid: Uuid::parse_str(&uuid_str).unwrap(),
             name: row.get(1)?,
             state: row.get(2)?,

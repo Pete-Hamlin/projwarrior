@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use task_hookrs::task::Task;
 use uuid::Uuid;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub enum State {
     #[default]
     Pending,
