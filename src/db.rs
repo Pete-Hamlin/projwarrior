@@ -115,3 +115,86 @@ pub fn get_projects(
     }
     Ok(projects)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+    use tempfile::NamedTempFile;
+    use uuid::Uuid;
+
+    fn setup_temp_db() -> (GtdConfig, Connection) {
+        let temp_file = NamedTempFile::new().unwrap();
+        let storage_path = temp_file.path().to_str().unwrap().to_string();
+        let cfg = GtdConfig {
+            storage_path,
+            ..Default::default()
+        };
+        let conn = Connection::open(&cfg.storage_path).unwrap();
+        init_db(&conn).unwrap();
+        (cfg, conn)
+    }
+
+    #[test]
+    fn test_check_db() {
+        let (cfg, _) = setup_temp_db();
+        assert!(check_db(&cfg).is_ok());
+    }
+
+    #[test]
+    fn test_insert_and_get_projects() {
+        let (cfg, _) = setup_temp_db();
+        let projects = vec![
+            Project {
+                id: 1,
+                uuid: Uuid::new_v4(),
+                name: "Project 1".to_string(),
+                state: State::Pending,
+            },
+            Project {
+                id: 2,
+                uuid: Uuid::new_v4(),
+                name: "Project 2".to_string(),
+                state: State::Complete,
+            },
+        ];
+
+        assert!(insert_projects(&cfg, &projects).is_ok());
+        let retrieved_projects = get_projects(&cfg, None, None).unwrap();
+        assert_eq!(retrieved_projects.len(), 2);
+        assert_eq!(retrieved_projects[0].name, "Project 1");
+        assert_eq!(retrieved_projects[1].state, State::Complete);
+    }
+
+    #[test]
+    fn test_update_project_status() {
+        let (cfg, _) = setup_temp_db();
+        let project = Project {
+            id: 1,
+            uuid: Uuid::new_v4(),
+            name: "Project 1".to_string(),
+            state: State::Pending,
+        };
+
+        insert_projects(&cfg, &[project.clone()]).unwrap();
+        assert!(update_project_status(&cfg, &State::Complete, &project.uuid).is_ok());
+        let updated_project = get_projects(&cfg, None, Some(&project.uuid)).unwrap();
+        assert_eq!(updated_project[0].state, State::Complete);
+    }
+
+    #[test]
+    fn test_delete_project() {
+        let (cfg, _) = setup_temp_db();
+        let project = Project {
+            id: 1,
+            uuid: Uuid::new_v4(),
+            name: "Project 1".to_string(),
+            state: State::Pending,
+        };
+
+        insert_projects(&cfg, &[project.clone()]).unwrap();
+        assert!(delete_project(&cfg, &project.uuid).is_ok());
+        let remaining_projects = get_projects(&cfg, None, None).unwrap();
+        assert!(remaining_projects.is_empty());
+    }
+}

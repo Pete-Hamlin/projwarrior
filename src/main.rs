@@ -39,17 +39,27 @@ fn main() {
 
 fn parse_subcommand(cfg: &GtdConfig, args: &Cli) {
     // If we have subcommands, command should be a project ID, which is an an integer
-    let projects = get_projects(&cfg, None, None).expect("Failed to retrieve project list");
-    let id: usize = args
+    let projects = match get_projects(&cfg, None, None) {
+        Ok(p) => p,
+        Err(_) => {
+            println!("Failed to retrieve project list");
+            return;
+        }
+    };
+
+    // Check to see if id provided is in range of project list
+    let id = match args
         .command
-        .clone()
-        .expect("ID incorrect format, check gtd --help for correct syntax")
-        .parse::<usize>()
-        .unwrap();
-    if id >= projects.len() {
-        println!("No project found with ID {:?}", id.to_string());
-        return;
-    }
+        .as_deref()
+        .and_then(|cmd| cmd.parse::<usize>().ok())
+    {
+        Some(id) if id < projects.len() => id,
+        _ => {
+            println!("Invalid or out-of-range project ID");
+            return;
+        }
+    };
+
     if let Some(subcommand) = args.subcommand.as_deref() {
         match subcommand {
             "show" => show_project(cfg, id),
