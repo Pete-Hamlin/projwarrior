@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use core::fmt;
 use rusqlite::types::{FromSql, FromSqlError, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
@@ -44,8 +45,10 @@ impl FromSql for State {
 pub struct Project {
     pub name: String,
     pub state: State,
-    pub id: u32,
+    pub id: Option<u32>,
     pub uuid: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Project {
@@ -61,7 +64,6 @@ impl Project {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use task_hookrs::task::Task;
     use uuid::Uuid;
 
     #[test]
@@ -92,7 +94,7 @@ mod tests {
         let project = Project {
             name: "Test Project".to_string(),
             state: State::Pending,
-            id: 1,
+            id: Some(1),
             uuid: Uuid::new_v4(),
         };
 

@@ -28,8 +28,11 @@ fn init_db(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS project (
             uuid TEXT PRIMARY KEY,
+            id INT,
             name TEXT NOT NULL,
-            state TEXT NOT NULL
+            state TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )",
         [],
     )?;
@@ -67,6 +70,23 @@ pub fn delete_project(cfg: &GtdConfig, project_id: &Uuid) -> Result<()> {
     conn.execute(
         "DELETE FROM project WHERE uuid = ?1",
         params![project_id.to_string()],
+    )?;
+    Ok(())
+}
+
+fn build_working_set(cfg: &GtdConfig) -> Result<()> {
+    let conn = Connection::open(&cfg.storage_path)?;
+    conn.execute(
+        "WITH ranked AS (
+            SELECT uuid, ROW_NUMBER() OVER (ORDER BY uuid) AS new_id
+            FROM project
+            WHERE state = 'pending'
+        )
+        UPDATE project
+        SET id = ranked.new_id
+        FROM ranked
+        WHERE project.uuid = ranked.uuid;",
+        [],
     )?;
     Ok(())
 }
