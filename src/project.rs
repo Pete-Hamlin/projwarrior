@@ -40,7 +40,7 @@ impl FromSql for State {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub name: String,
@@ -49,6 +49,19 @@ pub struct Project {
     pub uuid: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl Default for Project {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            state: State::Pending,
+            id: None,
+            uuid: Uuid::new_v4(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
 }
 
 impl Project {
@@ -91,11 +104,11 @@ mod tests {
 
     #[test]
     fn test_project_get_tasks() {
-        let project = Project {
+        let _project = Project {
             name: "Test Project".to_string(),
             state: State::Pending,
-            id: Some(1),
             uuid: Uuid::new_v4(),
+            ..Project::default()
         };
 
         // TODO: Make this actually work  intended (parse JSON output)
@@ -113,6 +126,5 @@ mod tests {
         let project = Project::default();
         assert_eq!(project.name, "");
         assert_eq!(project.state, State::Pending);
-        assert_eq!(project.id, 0);
     }
 }

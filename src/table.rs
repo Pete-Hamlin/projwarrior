@@ -9,8 +9,8 @@ use crate::project::{Project, State};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectTableItem {
-    pub index: u32,
-    pub status: State,
+    pub id: Option<u32>,
+    pub state: State,
     pub name: String,
     pub tasks: i32,
 }
@@ -36,8 +36,13 @@ pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project])
 
         if !cfg.short || item.tasks == 0 {
             table.add_row(vec![
-                Cell::new(item.index.to_string()).fg(color).bg(bg_color),
-                Cell::new(item.status.to_string()).fg(color).bg(bg_color),
+                Cell::new(match item.id {
+                    Some(id) => id.to_string(),
+                    None => "-".to_string(),
+                })
+                .fg(color)
+                .bg(bg_color),
+                Cell::new(item.state.to_string()).fg(color).bg(bg_color),
                 Cell::new(item.name.to_string()).fg(color).bg(bg_color),
                 Cell::new(item.tasks.to_string()).fg(color).bg(bg_color),
             ]);
@@ -57,7 +62,13 @@ pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task])
         Color::Reset
     };
     table.add_row(vec![Cell::new("Name"), Cell::new(&project.name).fg(color)]);
-    table.add_row(vec![Cell::new("ID"), Cell::new(&project.id)]);
+    table.add_row(vec![
+        Cell::new("ID"),
+        Cell::new(match &project.id {
+            Some(id) => id.to_string(),
+            None => "-".to_string(),
+        }),
+    ]);
     table.add_row(vec![Cell::new("UUID"), Cell::new(&project.uuid)]);
     table.add_row(vec![
         Cell::new("Status"),
@@ -84,7 +95,11 @@ fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
             None => "".to_string(),
         };
         table.add_row(vec![
-            Cell::new(item.id().unwrap_or(0)).bg(bg_color),
+            Cell::new(match item.id() {
+                Some(id) => id.to_string(),
+                None => "-".to_string(),
+            })
+            .bg(bg_color),
             Cell::new(item.entry().to_string()).bg(bg_color),
             Cell::new(item.description()).bg(bg_color),
             Cell::new(item.status().to_string()).bg(bg_color),
@@ -106,9 +121,9 @@ pub fn generate_project_list(tasks: &[Task], projects: &[Project]) -> Vec<Projec
         .map(|project| {
             let count = project.get_tasks(tasks);
             return ProjectTableItem {
-                index: project.id,
+                id: project.id,
                 name: project.name.clone(),
-                status: project.state.clone(),
+                state: project.state.clone(),
                 tasks: count,
             };
         })

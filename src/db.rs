@@ -2,6 +2,7 @@ use crate::{
     config::GtdConfig,
     project::{Project, State},
 };
+use chrono::Utc;
 use uuid::Uuid;
 
 use rusqlite::{Connection, Result, params};
@@ -43,25 +44,33 @@ pub fn insert_projects(cfg: &GtdConfig, projects: &[Project]) -> Result<()> {
     let mut conn = Connection::open(&cfg.storage_path)?;
     let tx = conn.transaction()?;
     {
-        let mut stmt = tx.prepare("INSERT INTO project (uuid, name, state) VALUES (?1, ?2, ?3)")?;
+        let mut stmt = tx.prepare("INSERT INTO project (uuid, name, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)")?;
         for project in projects {
             stmt.execute(params![
                 project.uuid.to_string(),
                 project.name,
-                project.state.to_string()
+                project.state.to_string(),
+                project.created_at.to_string(),
+                project.created_at.to_string(),
             ])?;
         }
     }
     tx.commit()?;
+    rebuild_working_set(conn)?;
     Ok(())
 }
 
 pub fn update_project_status(cfg: &GtdConfig, state: &State, project_id: &Uuid) -> Result<()> {
     let conn = Connection::open(&cfg.storage_path)?;
     conn.execute(
-        "UPDATE project SET state = ?1 WHERE uuid = ?2",
-        params![state.to_string(), project_id.to_string()],
+        "UPDATE project SET state = ?1, updated_at = ?2 WHERE uuid = ?3",
+        params![
+            state.to_string(),
+            Utc::now().to_string(),
+            project_id.to_string()
+        ],
     )?;
+    rebuild_working_set(conn)?;
     Ok(())
 }
 
@@ -71,16 +80,16 @@ pub fn delete_project(cfg: &GtdConfig, project_id: &Uuid) -> Result<()> {
         "DELETE FROM project WHERE uuid = ?1",
         params![project_id.to_string()],
     )?;
+    rebuild_working_set(conn)?;
     Ok(())
 }
 
-fn build_working_set(cfg: &GtdConfig) -> Result<()> {
-    let conn = Connection::open(&cfg.storage_path)?;
+fn rebuild_working_set(conn: Connection) -> Result<()> {
     conn.execute(
         "WITH ranked AS (
-            SELECT uuid, ROW_NUMBER() OVER (ORDER BY uuid) AS new_id
+            SELECT uuid, RANK() OVER (ORDER BY created_at ASC) new_id
             FROM project
-            WHERE state = 'pending'
+            WHERE state = 'Pending'
         )
         UPDATE project
         SET id = ranked.new_id
@@ -97,7 +106,7 @@ pub fn get_projects(
     uuid_filter: Option<&Uuid>,
 ) -> Result<Vec<Project>> {
     let conn = Connection::open(&cfg.storage_path)?;
-    let mut query = "SELECT uuid, name, state FROM project WHERE 1=1".to_string();
+    let mut query = "SELECT uuid, id, name, state FROM project WHERE 1=1".to_string();
     let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
 
     if let Some(state) = state_filter {
@@ -110,22 +119,16 @@ pub fn get_projects(
     }
 
     let mut stmt = conn.prepare(&query)?;
-    let mut id = 1;
     let project_iter = stmt.query_map(params.as_slice(), |row| {
         let uuid_str: String = row.get(0)?;
-        let state: State = row.get(2)?;
-        let task_id = match state {
-            State::Pending => id,
-            _ => 0,
-        };
-        if task_id != 0 {
-            id += 1;
-        }
         Ok(Project {
-            id: task_id,
+            id: row.get(1)?,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
             uuid: Uuid::parse_str(&uuid_str).unwrap(),
-            name: row.get(1)?,
-            state: row.get(2)?,
+            name: row.get(2)?,
+            state: row.get(3)?,
+            ..Project::default()
         })
     })?;
 
@@ -166,23 +169,29 @@ mod tests {
         let (cfg, _) = setup_temp_db();
         let projects = vec![
             Project {
-                id: 1,
+                id: Some(1),
                 uuid: Uuid::new_v4(),
                 name: "Project 1".to_string(),
                 state: State::Pending,
+                ..Project::default()
             },
             Project {
-                id: 2,
+                id: Some(2),
                 uuid: Uuid::new_v4(),
                 name: "Project 2".to_string(),
                 state: State::Complete,
+                ..Project::default()
             },
         ];
 
         assert!(insert_projects(&cfg, &projects).is_ok());
         let retrieved_projects = get_projects(&cfg, None, None).unwrap();
         assert_eq!(retrieved_projects.len(), 2);
+        assert_eq!(retrieved_projects[0].id, Some(1));
         assert_eq!(retrieved_projects[0].name, "Project 1");
+        assert_eq!(retrieved_projects[0].state, State::Pending);
+        assert_eq!(retrieved_projects[1].id, Some(2));
+        assert_eq!(retrieved_projects[1].name, "Project 2");
         assert_eq!(retrieved_projects[1].state, State::Complete);
     }
 
@@ -190,10 +199,11 @@ mod tests {
     fn test_update_project_status() {
         let (cfg, _) = setup_temp_db();
         let project = Project {
-            id: 1,
+            id: Some(1),
             uuid: Uuid::new_v4(),
             name: "Project 1".to_string(),
             state: State::Pending,
+            ..Project::default()
         };
 
         insert_projects(&cfg, &[project.clone()]).unwrap();
@@ -206,10 +216,11 @@ mod tests {
     fn test_delete_project() {
         let (cfg, _) = setup_temp_db();
         let project = Project {
-            id: 1,
+            id: Some(1),
             uuid: Uuid::new_v4(),
             name: "Project 1".to_string(),
             state: State::Pending,
+            ..Project::default()
         };
 
         insert_projects(&cfg, &[project.clone()]).unwrap();
