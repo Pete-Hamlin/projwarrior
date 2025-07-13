@@ -5,10 +5,15 @@ use uuid::Uuid;
 use rusqlite::{Connection, Result, params};
 
 pub struct DB {
-    pub conn: Connection,
+    conn: Connection,
 }
 
 impl DB {
+    pub fn new(storage_path: &str) -> Result<DB> {
+        Ok(DB {
+            conn: Connection::open(storage_path)?,
+        })
+    }
     pub fn check(&self) -> Result<()> {
         let result: Result<i32> = self.conn.query_row(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project'",

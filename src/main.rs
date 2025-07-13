@@ -15,15 +15,11 @@ use task_hookrs::task::Task;
 use tasks::get_task_list;
 use uuid::Uuid;
 
-use rusqlite::Connection;
-
 fn main() {
     let args = Cli::parse();
     let cfg = get_config(&args);
-    let mut db = DB {
-        conn: Connection::open(&cfg.storage_path).unwrap(),
-    };
-    match db.check() {
+    let mut db = DB::new(&cfg.storage_path).unwrap();
+   match db.check() {
         Ok(_) => (),
         Err(error) => println!("Error connecting to the database: {:?}", error),
     };
