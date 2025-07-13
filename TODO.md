@@ -2,9 +2,9 @@
 
 ## 1.0
 
-- [ ] sqlite backend storage
-- [ ] Project statuses
-- [ ] taskwarrior filter based on status
+- [x] sqlite backend storage
+- [x] Project statuses
+- [x] taskwarrior filter based on status
 - [ ] Tests
 - [ ] Update README
 
