@@ -155,33 +155,18 @@ impl DB {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use config::GtdConfig;
     use rusqlite::Connection;
-    use tempfile::NamedTempFile;
     use uuid::Uuid;
 
+    // Setup and in memory db and initialize tables
     fn setup_temp_db() -> DB {
-        let temp_file = NamedTempFile::new().unwrap();
-        let storage_path = temp_file.path().to_str().unwrap().to_string();
-        let cfg = GtdConfig {
-            storage_path,
-            ..Default::default()
-        };
-        let conn = Connection::open(&cfg.storage_path).unwrap();
+        let conn = Connection::open_in_memory().unwrap();
         let db = DB { conn };
         db.init().unwrap();
         db
     }
 
-    #[test]
-    fn test_check_db() {
-        let db = setup_temp_db();
-        assert!(db.check().is_ok());
-    }
-
-    #[test]
-    fn test_insert_and_get_projects() {
-        let mut db = setup_temp_db();
+    fn setup_default_projects(db: &mut DB) -> Vec<Project> {
         let projects = vec![
             Project {
                 id: Some(1),
@@ -198,16 +183,76 @@ mod tests {
                 ..Project::default()
             },
         ];
+        db.insert_projects(&projects).unwrap();
+        projects
+    }
+
+    #[test]
+    fn test_check_db() {
+        let db = setup_temp_db();
+        assert!(db.check().is_ok());
+    }
+
+    #[test]
+    fn test_insert_and_get_projects() {
+        let mut db = setup_temp_db();
+        let projects = vec![
+            Project {
+                uuid: Uuid::new_v4(),
+                name: "Project 1".to_string(),
+                state: State::Pending,
+                ..Project::default()
+            },
+            Project {
+                uuid: Uuid::new_v4(),
+                name: "Project 2".to_string(),
+                state: State::Complete,
+                ..Project::default()
+            },
+        ];
 
         assert!(db.insert_projects(&projects).is_ok());
         let retrieved_projects = db.get_projects(None, None, None).unwrap();
         assert_eq!(retrieved_projects.len(), 2);
         assert_eq!(retrieved_projects[0].id, Some(1));
         assert_eq!(retrieved_projects[0].name, "Project 1");
+        assert_eq!(retrieved_projects[0].uuid, projects[0].uuid);
         assert_eq!(retrieved_projects[0].state, State::Pending);
-        assert_eq!(retrieved_projects[1].id, Some(2));
+        assert_eq!(retrieved_projects[1].id, None);
         assert_eq!(retrieved_projects[1].name, "Project 2");
+        assert_eq!(retrieved_projects[1].uuid, projects[1].uuid);
         assert_eq!(retrieved_projects[1].state, State::Complete);
+    }
+
+    #[test]
+    fn test_state_filter() {
+        let mut db = setup_temp_db();
+        setup_default_projects(&mut db);
+        let pending_projects = db.get_projects(Some(&State::Pending), None, None).unwrap();
+        assert_eq!(pending_projects.len(), 1);
+        let completed_projects = db.get_projects(Some(&State::Complete), None, None).unwrap();
+        assert_eq!(completed_projects.len(), 1);
+    }
+
+    #[test]
+    fn test_uuid_filter() {
+        let mut db = setup_temp_db();
+        let projects = setup_default_projects(&mut db);
+        println!("{:?}", projects[0].uuid);
+        let uuid_filter = db
+            .get_projects(None, Some(&projects[0].uuid), None)
+            .unwrap();
+        assert_eq!(uuid_filter.len(), 1);
+        assert_eq!(uuid_filter[0].name, projects[0].name);
+    }
+
+    #[test]
+    fn test_id_filter() {
+        let mut db = setup_temp_db();
+        let projects = setup_default_projects(&mut db);
+        let uuid_filter = db.get_projects(None, None, Some(&1)).unwrap();
+        assert_eq!(uuid_filter.len(), 1);
+        assert_eq!(uuid_filter[0].name, projects[0].name);
     }
 
     #[test]
@@ -226,8 +271,14 @@ mod tests {
             db.update_project_status(&State::Complete, &project.uuid)
                 .is_ok()
         );
-        let updated_project = db.get_projects(None, Some(&project.uuid), None).unwrap();
-        assert_eq!(updated_project[0].state, State::Complete);
+        let pending_projects = db.get_projects(Some(&State::Pending), None, None).unwrap();
+        assert_eq!(pending_projects.len(), 0);
+        let updated_project = db.get_projects(Some(&State::Complete), None, None).unwrap();
+        assert_eq!(updated_project.len(), 1);
+
+        // Sanity checks
+        assert_eq!(updated_project[0].id, project.id);
+        assert_ne!(updated_project[0].updated_at, project.updated_at);
     }
 
     #[test]
