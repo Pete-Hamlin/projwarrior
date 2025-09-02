@@ -27,12 +27,13 @@ impl DB {
         Ok(())
     }
 
+    // uuid BLOB PRIMARY KEY CHECK(length(id) = 16),
     /// Sets up initial database tables
     fn init(&self) -> Result<()> {
         println!("Initializing projects db...");
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS project (
-            uuid TEXT PRIMARY KEY,
+            uuid BLOB PRIMARY KEY,
             id INT,
             name TEXT NOT NULL,
             state TEXT NOT NULL,
@@ -66,9 +67,9 @@ impl DB {
             let mut stmt = tx.prepare("INSERT INTO project (uuid, name, state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)")?;
             for project in projects {
                 stmt.execute(params![
-                    project.uuid.to_string(),
+                    project.uuid,
                     project.name,
-                    project.state.to_string(),
+                    project.state,
                     project.created_at.to_string(),
                     project.created_at.to_string(),
                 ])?;
@@ -82,21 +83,15 @@ impl DB {
     pub fn update_project_status(&self, state: &State, project_id: &Uuid) -> Result<()> {
         self.conn.execute(
             "UPDATE project SET state = ?1, updated_at = ?2 WHERE uuid = ?3",
-            params![
-                state.to_string(),
-                Utc::now().to_string(),
-                project_id.to_string()
-            ],
+            params![state, Utc::now().to_string(), project_id],
         )?;
         self.rebuild_working_set()?;
         Ok(())
     }
 
     pub fn delete_project(&self, project_id: &Uuid) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM project WHERE uuid = ?1",
-            params![project_id.to_string()],
-        )?;
+        self.conn
+            .execute("DELETE FROM project WHERE uuid = ?1", params![project_id])?;
         self.rebuild_working_set()?;
         Ok(())
     }
@@ -111,10 +106,6 @@ impl DB {
         let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
 
         // Build filters
-        if let Some(state) = state_filter {
-            query.push_str(" AND state = ?");
-            params.push(state);
-        }
         if let Some(uuid) = uuid_filter {
             query.push_str(" AND uuid = ?");
             params.push(uuid);
@@ -123,15 +114,17 @@ impl DB {
             query.push_str(" AND id = ?");
             params.push(id);
         }
+        if let Some(state) = state_filter {
+            query.push_str(" AND state = ?");
+            params.push(state);
+        }
 
+        println!("{query:#?}");
         let mut stmt = self.conn.prepare(&query)?;
         let project_iter = stmt.query_map(params.as_slice(), |row| {
-            let uuid_str: String = row.get(0)?;
             Ok(Project {
                 id: row.get(1)?,
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-                uuid: Uuid::parse_str(&uuid_str).unwrap(),
+                uuid: row.get(0)?,
                 name: row.get(2)?,
                 state: row.get(3)?,
                 ..Project::default()
@@ -140,6 +133,7 @@ impl DB {
 
         let mut projects = Vec::new();
         for project in project_iter {
+            println!("{project:#?}");
             projects.push(project?);
         }
         Ok(projects)
@@ -238,7 +232,7 @@ mod tests {
     fn test_uuid_filter() {
         let mut db = setup_temp_db();
         let projects = setup_default_projects(&mut db);
-        println!("{:?}", projects[0].uuid);
+        // println!("{:?}", projects[0].uuid);
         let uuid_filter = db
             .get_projects(None, Some(&projects[0].uuid), None)
             .unwrap();
