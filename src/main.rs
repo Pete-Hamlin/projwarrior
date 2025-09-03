@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 mod config;
 mod db;
+mod filters;
 mod project;
 mod table;
 mod tasks;
@@ -14,6 +15,8 @@ use table::{project_details_table, project_list_table};
 use task_hookrs::task::Task;
 use tasks::get_task_list;
 use uuid::Uuid;
+
+use crate::filters::ProjectFilter;
 
 fn main() {
     let args = Cli::parse();
@@ -62,28 +65,37 @@ fn init_projects(cfg: &GtdConfig, db: &mut DB) {
 
 fn list_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
     let tasks = get_task_list(cfg).expect("Failed to get task list");
-    let filter = match args.subcommand.as_deref() {
+    let state = match args.subcommand.as_deref() {
         Some("all") => None,
         Some("incubate") => Some(&State::Incubate),
         Some("done") => Some(&State::Complete),
         _ => Some(&State::Pending),
     };
+    let filters = match state {
+        Some(filter) => ProjectFilter::builder().state(filter).build(),
+        None => ProjectFilter::builder().build(),
+    };
+
     let projects = db
-        .get_projects(filter, None, None)
+        .get_projects(&filters)
         .expect("Failed to retrieve project list");
     project_list_table(cfg, &tasks, &projects);
 }
 
 fn count_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
     let tasks = get_task_list(cfg).expect("Failed to get task list");
-    let filter = match args.subcommand.as_deref() {
+    let state = match args.subcommand.as_deref() {
         Some("all") => None,
         Some("incubate") => Some(&State::Incubate),
         Some("done") => Some(&State::Complete),
         _ => Some(&State::Pending),
     };
+    let filters = match state {
+        Some(filter) => ProjectFilter::builder().state(filter).build(),
+        None => ProjectFilter::builder().build(),
+    };
     let projects = db
-        .get_projects(filter, None, None)
+        .get_projects(&filters)
         .expect("Failed to retrieve project list");
 
     if !cfg.short {
@@ -134,8 +146,9 @@ fn parse_subcommand(cfg: &GtdConfig, db: &DB, args: &Cli) {
             return;
         }
     };
+    let filters = ProjectFilter::builder().id(&id).build();
 
-    let project = match db.get_projects(None, None, Some(&id)) {
+    let project = match db.get_projects(&filters) {
         Ok(p) => p.into_iter().next().unwrap(),
         Err(_) => {
             println!("Failed to retrieve project from list");

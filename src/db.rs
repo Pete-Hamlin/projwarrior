@@ -1,3 +1,4 @@
+use crate::filters::ProjectFilter;
 use crate::project::{Project, State};
 use chrono::Utc;
 use uuid::Uuid;
@@ -99,7 +100,7 @@ impl DB {
     pub fn update_project_status(&self, state: &State, project_id: &Uuid) -> Result<()> {
         self.conn.execute(
             "UPDATE project SET state = ?1, updated_at = ?2 WHERE uuid = ?3",
-            params![state, Utc::now().to_string(), project_id],
+            params![state, Utc::now().to_rfc3339(), project_id],
         )?;
         self.rebuild_working_set()?;
         Ok(())
@@ -112,27 +113,28 @@ impl DB {
         Ok(())
     }
 
-    pub fn get_projects(
-        &self,
-        state_filter: Option<&State>,
-        uuid_filter: Option<&Uuid>,
-        id_filter: Option<&u32>,
-    ) -> Result<Vec<Project>> {
+    pub fn get_projects(&self, options: &ProjectFilter) -> Result<Vec<Project>> {
         let mut query =
             "SELECT uuid, id, name, state, created_at, updated_at FROM project WHERE 1=1"
                 .to_string();
         let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
 
         // Build filters
-        if let Some(uuid) = uuid_filter {
+        if let Some(uuid) = options.uuid {
             query.push_str(" AND uuid = ?");
             params.push(uuid);
         }
-        if let Some(id) = id_filter {
+        if let Some(id) = options.id {
             query.push_str(" AND id = ?");
             params.push(id);
         }
-        if let Some(state) = state_filter {
+
+        if let Some(name) = options.name {
+            query.push_str(" AND name LIKE '%?%'");
+            params.push(name);
+        }
+
+        if let Some(state) = options.state {
             query.push_str(" AND state = ?");
             params.push(state);
         }
@@ -231,7 +233,8 @@ mod tests {
         ];
 
         assert!(db.insert_projects(&projects).is_ok());
-        let retrieved_projects = db.get_projects(None, None, None).unwrap();
+        let filters = ProjectFilter::builder().build();
+        let retrieved_projects = db.get_projects(&filters).unwrap();
         assert_eq!(retrieved_projects.len(), 2);
         assert_eq!(retrieved_projects[0].id, Some(1));
         assert_eq!(retrieved_projects[0].name, "Project 1");
@@ -247,9 +250,13 @@ mod tests {
     fn test_state_filter() {
         let mut db = setup_temp_db();
         setup_default_projects(&mut db);
-        let pending_projects = db.get_projects(Some(&State::Pending), None, None).unwrap();
+
+        let filters = ProjectFilter::builder().state(&State::Pending).build();
+        let pending_projects = db.get_projects(&filters).unwrap();
         assert_eq!(pending_projects.len(), 1);
-        let completed_projects = db.get_projects(Some(&State::Complete), None, None).unwrap();
+
+        let filters = ProjectFilter::builder().state(&State::Complete).build();
+        let completed_projects = db.get_projects(&filters).unwrap();
         assert_eq!(completed_projects.len(), 1);
     }
 
@@ -257,9 +264,8 @@ mod tests {
     fn test_uuid_filter() {
         let mut db = setup_temp_db();
         let projects = setup_default_projects(&mut db);
-        let uuid_filter = db
-            .get_projects(None, Some(&projects[0].uuid), None)
-            .unwrap();
+        let filters = ProjectFilter::builder().uuid(&projects[0].uuid).build();
+        let uuid_filter = db.get_projects(&filters).unwrap();
         assert_eq!(uuid_filter.len(), 1);
         assert_eq!(uuid_filter[0].name, projects[0].name);
     }
@@ -268,7 +274,8 @@ mod tests {
     fn test_id_filter() {
         let mut db = setup_temp_db();
         let projects = setup_default_projects(&mut db);
-        let uuid_filter = db.get_projects(None, None, Some(&1)).unwrap();
+        let filters = ProjectFilter::builder().id(&1).build();
+        let uuid_filter = db.get_projects(&filters).unwrap();
         assert_eq!(uuid_filter.len(), 1);
         assert_eq!(uuid_filter[0].name, projects[0].name);
     }
@@ -289,13 +296,17 @@ mod tests {
             db.update_project_status(&State::Complete, &project.uuid)
                 .is_ok()
         );
-        let pending_projects = db.get_projects(Some(&State::Pending), None, None).unwrap();
+        let filters = ProjectFilter::builder().state(&State::Pending).build();
+        let pending_projects = db.get_projects(&filters).unwrap();
         assert_eq!(pending_projects.len(), 0);
-        let updated_project = db.get_projects(Some(&State::Complete), None, None).unwrap();
+
+        let filters = ProjectFilter::builder().state(&State::Complete).build();
+        let updated_project = db.get_projects(&filters).unwrap();
         assert_eq!(updated_project.len(), 1);
 
         // Sanity checks
-        assert_eq!(updated_project[0].id, project.id);
+        assert_eq!(updated_project[0].uuid, project.uuid);
+        assert_ne!(updated_project[0].id, project.id);
         assert_ne!(updated_project[0].updated_at, project.updated_at);
     }
 
@@ -312,7 +323,8 @@ mod tests {
 
         db.insert_projects(std::slice::from_ref(&project)).unwrap();
         assert!(db.delete_project(&project.uuid).is_ok());
-        let remaining_projects = db.get_projects(None, None, None).unwrap();
+        let filters = ProjectFilter::builder().build();
+        let remaining_projects = db.get_projects(&filters).unwrap();
         assert!(remaining_projects.is_empty());
     }
 }
