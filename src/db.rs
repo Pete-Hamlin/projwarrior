@@ -27,7 +27,6 @@ impl DB {
         Ok(())
     }
 
-    // uuid BLOB PRIMARY KEY CHECK(length(id) = 16),
     /// Sets up initial database tables
     fn init(&self) -> Result<()> {
         println!("Initializing projects db...");
@@ -45,6 +44,11 @@ impl DB {
         Ok(())
     }
 
+    /// Rebuilds the 'working set' indexes for pending projects.
+    ///
+    /// Should only be run on an action that affects the state of the working set (e.g.
+    /// completing/deleting a project).
+    /// Each pending project will be 1-indexed for ease of reference/access, same as taskwarrior.
     fn rebuild_working_set(&self) -> Result<()> {
         self.conn.execute(
             "WITH ranked AS (
@@ -58,6 +62,18 @@ impl DB {
         WHERE project.uuid = ranked.uuid;",
             [],
         )?;
+        self.clear_old_ids()?;
+        Ok(())
+    }
+
+    /// Simple SQL statement that sets all working IDs to NULL for non-pending projects.
+    ///
+    /// Used to clear out working index IDs for projects that are no longer pending.
+    /// Without this, completed projects will be left with the working ID they had when they were
+    /// moved from pending.
+    fn clear_old_ids(&self) -> Result<()> {
+        self.conn
+            .execute("UPDATE project SET id = NULL WHERE state != 'Pending'", [])?;
         Ok(())
     }
 
@@ -70,8 +86,8 @@ impl DB {
                     project.uuid,
                     project.name,
                     project.state,
-                    project.created_at.to_string(),
-                    project.created_at.to_string(),
+                    project.created_at.to_rfc3339(),
+                    project.updated_at.to_rfc3339(),
                 ])?;
             }
         }
@@ -102,7 +118,9 @@ impl DB {
         uuid_filter: Option<&Uuid>,
         id_filter: Option<&u32>,
     ) -> Result<Vec<Project>> {
-        let mut query = "SELECT uuid, id, name, state FROM project WHERE 1=1".to_string();
+        let mut query =
+            "SELECT uuid, id, name, state, created_at, updated_at FROM project WHERE 1=1"
+                .to_string();
         let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
 
         // Build filters
@@ -121,12 +139,21 @@ impl DB {
 
         let mut stmt = self.conn.prepare(&query)?;
         let project_iter = stmt.query_map(params.as_slice(), |row| {
+            let created_at =
+                chrono::DateTime::parse_from_rfc3339(row.get::<_, String>(4)?.as_str())
+                    .unwrap()
+                    .with_timezone(&Utc);
+            let updated_at =
+                chrono::DateTime::parse_from_rfc3339(row.get::<_, String>(5)?.as_str())
+                    .unwrap()
+                    .with_timezone(&Utc);
             Ok(Project {
                 id: row.get(1)?,
                 uuid: row.get(0)?,
                 name: row.get(2)?,
                 state: row.get(3)?,
-                ..Project::default()
+                created_at,
+                updated_at,
             })
         })?;
 

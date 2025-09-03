@@ -24,7 +24,7 @@ where
 {
     let output = Command::new(command).args(args).output()?;
 
-    // This sequence can contain invalid chars (e.g. certain emojis, so we need to use lossy here)
+    //NOTE: This sequence can contain invalid chars (e.g. certain emojis, so we need to use lossy here)
     let value = String::from_utf8_lossy(&output.stdout);
     let tasks: T = from_str(&value)?;
     Ok(tasks)

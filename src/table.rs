@@ -4,19 +4,17 @@ use serde::{Deserialize, Serialize};
 use task_hookrs::task::Task;
 
 use crate::config::GtdConfig;
-use crate::project::{Project, State};
+use crate::project::Project;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectTableItem {
-    pub id: Option<u32>,
-    pub state: State,
-    pub name: String,
+    pub project: Project,
     pub tasks: i32,
 }
 
 pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
-    let headers = vec!["ID", "Status", "Name", "Tasks"];
+    let headers = vec!["ID", "Name", "Tasks", "Entry"];
     let mut table = create_table(&headers);
     let mut output = generate_project_list(tasks, projects);
 
@@ -36,15 +34,24 @@ pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project])
 
         if !cfg.short || item.tasks == 0 {
             table.add_row(vec![
-                Cell::new(match item.id {
+                Cell::new(match item.project.id {
                     Some(id) => id.to_string(),
                     None => "-".to_string(),
                 })
                 .fg(color)
                 .bg(bg_color),
-                Cell::new(item.state.to_string()).fg(color).bg(bg_color),
-                Cell::new(item.name.to_string()).fg(color).bg(bg_color),
+                Cell::new(item.project.name.to_string())
+                    .fg(color)
+                    .bg(bg_color),
                 Cell::new(item.tasks.to_string()).fg(color).bg(bg_color),
+                Cell::new(
+                    item.project
+                        .created_at
+                        .format("%Y-%m-%d %H:%M:%S")
+                        .to_string(),
+                )
+                .fg(color)
+                .bg(bg_color),
             ]);
         }
     }
@@ -121,9 +128,7 @@ pub fn generate_project_list(tasks: &[Task], projects: &[Project]) -> Vec<Projec
         .map(|project| {
             let count = project.get_tasks(tasks);
             ProjectTableItem {
-                id: project.id,
-                name: project.name.clone(),
-                state: project.state.clone(),
+                project: project.clone(),
                 tasks: count,
             }
         })
