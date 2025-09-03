@@ -119,7 +119,6 @@ impl DB {
             params.push(state);
         }
 
-        println!("{query:#?}");
         let mut stmt = self.conn.prepare(&query)?;
         let project_iter = stmt.query_map(params.as_slice(), |row| {
             Ok(Project {
@@ -133,7 +132,6 @@ impl DB {
 
         let mut projects = Vec::new();
         for project in project_iter {
-            println!("{project:#?}");
             projects.push(project?);
         }
         Ok(projects)
@@ -232,7 +230,6 @@ mod tests {
     fn test_uuid_filter() {
         let mut db = setup_temp_db();
         let projects = setup_default_projects(&mut db);
-        // println!("{:?}", projects[0].uuid);
         let uuid_filter = db
             .get_projects(None, Some(&projects[0].uuid), None)
             .unwrap();
