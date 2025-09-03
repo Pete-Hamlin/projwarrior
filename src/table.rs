@@ -69,14 +69,14 @@ pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task])
             None => "-".to_string(),
         }),
     ]);
-    table.add_row(vec![Cell::new("UUID"), Cell::new(&project.uuid)]);
+    table.add_row(vec![Cell::new("UUID"), Cell::new(project.uuid)]);
     table.add_row(vec![
         Cell::new("Status"),
         Cell::new(format!("{:?}", &project.state)),
     ]);
 
     println!("{table}");
-    if tasks.len() > 0 {
+    if !tasks.is_empty() {
         task_list_table(cfg, tasks);
     }
 }
@@ -84,7 +84,7 @@ pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task])
 fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
     let headers = vec!["ID", "Entry", "Description", "Status", "Tags"];
     let mut table = create_table(&headers);
-    for (index, item) in tasks.into_iter().enumerate() {
+    for (index, item) in tasks.iter().enumerate() {
         let bg_color = if cfg.color && index % 2 == 0 {
             Color::Black
         } else {
@@ -120,15 +120,15 @@ pub fn generate_project_list(tasks: &[Task], projects: &[Project]) -> Vec<Projec
         .iter()
         .map(|project| {
             let count = project.get_tasks(tasks);
-            return ProjectTableItem {
+            ProjectTableItem {
                 id: project.id,
                 name: project.name.clone(),
                 state: project.state.clone(),
                 tasks: count,
-            };
+            }
         })
         .collect();
-    return result;
+    result
 }
 
 fn create_table(headers: &[&str]) -> Table {
@@ -140,13 +140,13 @@ fn create_table(headers: &[&str]) -> Table {
         .collect();
 
     table.set_header(table_headers);
-    return table;
+    table
 }
 
 fn determine_proj_color(task_count: usize) -> Color {
     if task_count == 0 {
-        return Color::Yellow;
+        Color::Yellow
     } else {
-        return Color::Green;
+        Color::Green
     }
 }

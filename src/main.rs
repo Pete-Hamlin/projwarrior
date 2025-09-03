@@ -19,7 +19,7 @@ fn main() {
     let args = Cli::parse();
     let cfg = get_config(&args);
     let mut db = DB::new(&cfg.storage_path).unwrap();
-   match db.check() {
+    match db.check() {
         Ok(_) => (),
         Err(error) => println!("Error connecting to the database: {:?}", error),
     };
@@ -37,12 +37,12 @@ fn main() {
     }
 }
 
-fn init_projects(cfg: &GtdConfig, db: &mut DB) -> () {
-    let tasks = get_task_list(&cfg).expect("Failed to get task list");
+fn init_projects(cfg: &GtdConfig, db: &mut DB) {
+    let tasks = get_task_list(cfg).expect("Failed to get task list");
     let mut name_list: Vec<String> = vec![];
     tasks.into_iter().for_each(|task| {
         let project_name = task.project().unwrap();
-        if !name_list.contains(&project_name) {
+        if !name_list.contains(project_name) {
             name_list.push(project_name.clone());
         }
     });
@@ -61,7 +61,7 @@ fn init_projects(cfg: &GtdConfig, db: &mut DB) -> () {
 }
 
 fn list_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
-    let tasks = get_task_list(&cfg).expect("Failed to get task list");
+    let tasks = get_task_list(cfg).expect("Failed to get task list");
     let filter = match args.subcommand.as_deref() {
         Some("all") => None,
         Some("incubate") => Some(&State::Incubate),
@@ -75,7 +75,7 @@ fn list_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
 }
 
 fn count_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
-    let tasks = get_task_list(&cfg).expect("Failed to get task list");
+    let tasks = get_task_list(cfg).expect("Failed to get task list");
     let filter = match args.subcommand.as_deref() {
         Some("all") => None,
         Some("incubate") => Some(&State::Incubate),
@@ -87,7 +87,7 @@ fn count_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
         .expect("Failed to retrieve project list");
 
     if !cfg.short {
-        let count = projects.into_iter().count();
+        let count = projects.len();
         println!("{:?}", count)
     } else {
         let count = projects
@@ -98,7 +98,7 @@ fn count_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
     }
 }
 
-fn add_project(db: &mut DB, args: &Cli) -> () {
+fn add_project(db: &mut DB, args: &Cli) {
     if let Some(subcommand) = args.subcommand.as_deref() {
         let project = vec![Project {
             name: subcommand.to_string(),
@@ -136,7 +136,7 @@ fn parse_subcommand(cfg: &GtdConfig, db: &DB, args: &Cli) {
     };
 
     let project = match db.get_projects(None, None, Some(&id)) {
-        Ok(p) => p.into_iter().nth(0).unwrap(),
+        Ok(p) => p.into_iter().next().unwrap(),
         Err(_) => {
             println!("Failed to retrieve project from list");
             return;
@@ -158,7 +158,7 @@ fn parse_subcommand(cfg: &GtdConfig, db: &DB, args: &Cli) {
 }
 
 fn show_project(cfg: &GtdConfig, project: &Project) {
-    let tasks = get_task_list(&cfg).expect("Failed to get task list");
+    let tasks = get_task_list(cfg).expect("Failed to get task list");
     let project_tasks: Vec<Task> = tasks
         .iter()
         .filter(|t| t.project() == Some(&project.name))
@@ -167,28 +167,28 @@ fn show_project(cfg: &GtdConfig, project: &Project) {
     project_details_table(cfg, project, &project_tasks);
 }
 
-fn mark_project_done(db: &DB, project: &Project) -> () {
+fn mark_project_done(db: &DB, project: &Project) {
     match db.update_project_status(&State::Complete, &project.uuid) {
         Ok(_) => println!("Marked project {:?} as done!", project.name),
         Err(e) => println!("Unable to process project, error: {e:?}"),
     };
 }
 
-fn mark_project_incubate(db: &DB, project: &Project) -> () {
+fn mark_project_incubate(db: &DB, project: &Project) {
     match db.update_project_status(&State::Incubate, &project.uuid) {
         Ok(_) => println!("Incubated project {:?}!", project.name),
         Err(e) => println!("Unable to process project, error: {e:?}"),
     };
 }
 
-fn mark_project_pending(db: &DB, project: &Project) -> () {
+fn mark_project_pending(db: &DB, project: &Project) {
     match db.update_project_status(&State::Pending, &project.uuid) {
         Ok(_) => println!("Marked project {:?} as pending!", project.name),
         Err(e) => println!("Unable to process project, error: {e:?}"),
     };
 }
 
-fn delete_project_item(db: &DB, project: &Project) -> () {
+fn delete_project_item(db: &DB, project: &Project) {
     match db.delete_project(&project.uuid) {
         Ok(_) => println!("Successfully removed project {:?}", project.name),
         Err(_) => println!("Failed to remove project {:?}", project.name),

@@ -257,7 +257,7 @@ mod tests {
             ..Project::default()
         };
 
-        db.insert_projects(&[project.clone()]).unwrap();
+        db.insert_projects(std::slice::from_ref(&project)).unwrap();
         assert!(
             db.update_project_status(&State::Complete, &project.uuid)
                 .is_ok()
@@ -283,7 +283,7 @@ mod tests {
             ..Project::default()
         };
 
-        db.insert_projects(&[project.clone()]).unwrap();
+        db.insert_projects(std::slice::from_ref(&project)).unwrap();
         assert!(db.delete_project(&project.uuid).is_ok());
         let remaining_projects = db.get_projects(None, None, None).unwrap();
         assert!(remaining_projects.is_empty());

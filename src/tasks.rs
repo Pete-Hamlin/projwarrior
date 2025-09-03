@@ -12,7 +12,7 @@ pub fn get_task_list(cfg: &GtdConfig) -> Result<Vec<Task>, Box<dyn Error>> {
     let tasks = parse_json_from_command::<Vec<Task>>(&cfg.task_path, &["export"])?;
     let filtered_tasks = tasks
         .into_iter()
-        .filter(|t| t.project() != None)
+        .filter(|t| t.project().is_some())
         .filter(|t| t.status() == &TaskStatus::Pending || t.status() == &TaskStatus::Waiting)
         .collect();
     Ok(filtered_tasks)

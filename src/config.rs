@@ -49,17 +49,17 @@ fn get_task_bin() -> String {
     let task_bin = Command::new("which").arg("task").output().expect(
         "Failed to find task binary - please ensure the `task` command is available in your $PATH",
     );
-    return String::from_utf8(task_bin.stdout)
+    String::from_utf8(task_bin.stdout)
         .unwrap()
         .trim()
-        .to_owned();
+        .to_owned()
 }
 
 pub fn get_config(args: &Cli) -> GtdConfig {
     // Load config
     let cfg: GtdConfig = confy::load("projwarrior", None).expect("Failed to load config");
     // Overwrite config file with CLI options
-    return GtdConfig {
+    GtdConfig {
         short: if args.short || args.long {
             !args.long
         } else {
@@ -67,5 +67,5 @@ pub fn get_config(args: &Cli) -> GtdConfig {
         },
         color: if args.color { true } else { cfg.color },
         ..cfg
-    };
+    }
 }

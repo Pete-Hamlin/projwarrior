@@ -24,7 +24,7 @@ impl fmt::Display for State {
 }
 
 impl ToSql for State {
-    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error> {
+    fn to_sql(&'_ self) -> Result<ToSqlOutput<'_>, rusqlite::Error> {
         Ok(ToSqlOutput::from(self.to_string()))
     }
 }
@@ -67,10 +67,10 @@ impl Default for Project {
 impl Project {
     pub fn get_tasks(&self, tasks: &[Task]) -> i32 {
         let count = tasks
-            .into_iter()
-            .filter(|t| t.project().as_deref() == Some(&self.name))
+            .iter()
+            .filter(|t| t.project() == Some(&self.name))
             .count();
-        return count as i32;
+        count as i32
     }
 }
 
