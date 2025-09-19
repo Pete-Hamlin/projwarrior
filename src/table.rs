@@ -44,14 +44,9 @@ pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project])
                     .fg(color)
                     .bg(bg_color),
                 Cell::new(item.tasks.to_string()).fg(color).bg(bg_color),
-                Cell::new(
-                    item.project
-                        .created_at
-                        .format("%Y-%m-%d %H:%M:%S")
-                        .to_string(),
-                )
-                .fg(color)
-                .bg(bg_color),
+                Cell::new(item.project.created_at.format("%Y-%m-%d").to_string())
+                    .fg(color)
+                    .bg(bg_color),
             ]);
         }
     }
