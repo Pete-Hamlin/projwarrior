@@ -19,6 +19,7 @@ use uuid::Uuid;
 use crate::{
     config::{CommandType, FilterType},
     filters::ProjectFilter,
+    table::Column,
 };
 
 fn main() -> Result<(), String> {
@@ -88,7 +89,21 @@ fn list_projects(cfg: &GtdConfig, db: &DB, subcommand: &Option<String>) {
     let projects = db
         .get_projects(&filters)
         .expect("Failed to retrieve project list");
-    project_list_table(cfg, &tasks, &projects);
+
+    let columns = match state {
+        Some(&State::Complete) => vec![Column::Uuid, Column::Name, Column::Tasks, Column::Entry],
+        Some(_) => vec![Column::Id, Column::Name, Column::Tasks, Column::Entry],
+        None => vec![
+            Column::Id,
+            Column::Uuid,
+            Column::State,
+            Column::Name,
+            Column::Tasks,
+            Column::Entry,
+        ],
+    };
+
+    project_list_table(cfg, &tasks, &projects, &columns);
 }
 
 fn count_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
@@ -150,7 +165,12 @@ fn parse_filter(cfg: &GtdConfig, db: &DB, filter_enum: &FilterType, subcommand: 
         let projects = db
             .get_projects(&query)
             .expect("Failed to retrieve project list");
-        project_list_table(cfg, &tasks, &projects);
+        project_list_table(
+            cfg,
+            &tasks,
+            &projects,
+            &[Column::Id, Column::Name, Column::Tasks, Column::Entry],
+        );
     } else {
         let project = match db.get_projects(&query) {
             Ok(p) => p.into_iter().next().unwrap(),

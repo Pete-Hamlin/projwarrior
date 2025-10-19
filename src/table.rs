@@ -13,8 +13,50 @@ pub struct ProjectTableItem {
     pub tasks: i32,
 }
 
-pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project]) {
-    let headers = vec!["ID", "Name", "Tasks", "Entry"];
+pub enum Column {
+    Id,
+    Uuid,
+    Name,
+    State,
+    Tasks,
+    Entry,
+}
+
+impl Column {
+    fn header(&self) -> &str {
+        match self {
+            Column::Id => "ID",
+            Column::Uuid => "UUID",
+            Column::Name => "Name",
+            Column::State => "Status",
+            Column::Tasks => "Tasks",
+            Column::Entry => "Entry",
+        }
+    }
+
+    fn row(&self, item: &ProjectTableItem) -> String {
+        match self {
+            Column::Id => match item.project.id {
+                Some(id) => id.to_string(),
+                None => "-".to_string(),
+            },
+            Column::Uuid => item.project.uuid.to_string(),
+            Column::Name => item.project.name.to_string(),
+            Column::State => item.project.state.to_string(),
+            Column::Tasks => item.tasks.to_string(),
+            Column::Entry => item.project.created_at.format("%Y-%m-%d").to_string(),
+        }
+    }
+}
+
+pub fn project_list_table(
+    cfg: &GtdConfig,
+    tasks: &[Task],
+    projects: &[Project],
+    columns: &[Column],
+) {
+    // let headers = vec!["ID", "Name", "Tasks", "Entry"];
+    let headers: Vec<&str> = columns.iter().map(|col| col.header()).collect();
     let mut table = create_table(&headers);
     let mut output = generate_project_list(tasks, projects);
 
@@ -33,21 +75,12 @@ pub fn project_list_table(cfg: &GtdConfig, tasks: &[Task], projects: &[Project])
         };
 
         if !cfg.short || item.tasks == 0 {
-            table.add_row(vec![
-                Cell::new(match item.project.id {
-                    Some(id) => id.to_string(),
-                    None => "-".to_string(),
-                })
-                .fg(color)
-                .bg(bg_color),
-                Cell::new(item.project.name.to_string())
-                    .fg(color)
-                    .bg(bg_color),
-                Cell::new(item.tasks.to_string()).fg(color).bg(bg_color),
-                Cell::new(item.project.created_at.format("%Y-%m-%d").to_string())
-                    .fg(color)
-                    .bg(bg_color),
-            ]);
+            let rows: Vec<Cell> = columns
+                .iter()
+                .map(|col| Cell::new(col.row(&item)).fg(color).bg(bg_color))
+                .collect();
+
+            table.add_row(rows);
         }
     }
     if table.row_count() > 0 {
