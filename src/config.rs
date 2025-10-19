@@ -2,12 +2,65 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::process::Command;
+use std::str::FromStr;
+use uuid::Uuid;
+
+#[derive(Debug, Clone)]
+pub enum CommandType {
+    Init,
+    Reset,
+    List,
+    Count,
+    Add,
+    Query(FilterType),
+}
+
+impl FromStr for CommandType {
+    type Err = String;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "init" => Ok(CommandType::Init),
+            "reset" => Ok(CommandType::Reset),
+            "list" => Ok(CommandType::List),
+            "count" => Ok(CommandType::Count),
+            "add" => Ok(CommandType::Add),
+            _ => {
+                let query = FilterType::from_str(input)?;
+                Ok(CommandType::Query(query))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FilterType {
+    ID(u32),
+    Uuid(Uuid),
+    Filter(String),
+}
+
+impl FromStr for FilterType {
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        if let Ok(id) = input.parse::<u32>() {
+            Ok(Self::ID(id))
+        } else if let Ok(uuid) = Uuid::parse_str(input) {
+            Ok(Self::Uuid(uuid))
+        } else {
+            // Default is to treat arg as a string filter
+            Ok(Self::Filter(input.to_string()))
+        }
+    }
+}
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Cli {
     /// Command to run (init, list, add, reset or a project ID)
-    pub command: Option<String>,
+    // #[arg(value_parser = clap::builder::ValueParser::from_str::<CommandType>(), required = false)]
+    #[arg(value_parser = clap::value_parser!(CommandType), required = false)]
+    pub command: Option<CommandType>,
     /// Optional subcommand to work on
     pub subcommand: Option<String>,
 
