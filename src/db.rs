@@ -45,6 +45,12 @@ impl DB {
         Ok(())
     }
 
+    pub fn reset(&self) -> Result<()> {
+        println!("Dropping projects db...");
+        self.conn.execute("DROP TABLE IF EXISTS project", [])?;
+        Ok(())
+    }
+
     /// Rebuilds the 'working set' indexes for pending projects.
     ///
     /// Should only be run on an action that affects the state of the working set (e.g.
@@ -129,9 +135,11 @@ impl DB {
             params.push(id);
         }
 
+        let name_param: String;
         if let Some(name) = options.name {
-            query.push_str(" AND name LIKE '%?%'");
-            params.push(name);
+            query.push_str(" AND name LIKE ?");
+            name_param = format!("%{}%", name);
+            params.push(&name_param);
         }
 
         if let Some(state) = options.state {
