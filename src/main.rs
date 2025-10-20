@@ -52,6 +52,7 @@ fn init_projects(cfg: &GtdConfig, db: &mut DB) {
             name_list.push(project_name.clone());
         }
     });
+    let total = name_list.len();
     let projects: Vec<Project> = name_list
         .into_iter()
         .map(|name| Project {
@@ -61,8 +62,8 @@ fn init_projects(cfg: &GtdConfig, db: &mut DB) {
         })
         .collect();
     match db.insert_projects(&projects) {
-        Ok(_p) => println!("Successfully initialized new project list"),
-        Err(e) => println!("Failed to write project list: {:?}", e),
+        Ok(_p) => println!("Successfully initialized project list - {total:?} projects added"),
+        Err(e) => println!("Failed to write project list: {e:?}"),
     }
 }
 
@@ -142,7 +143,7 @@ fn add_project(db: &mut DB, args: &Cli) {
             ..Default::default()
         }];
         match db.insert_projects(&project) {
-            Ok(_p) => println!("Successfully processed project"),
+            Ok(_p) => println!("Successfully added project {:?}", subcommand.to_string()),
             Err(e) => println!("Failed to add project {:?}", e),
         }
     } else {
