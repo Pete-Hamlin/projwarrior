@@ -26,14 +26,13 @@ impl Cache {
             }
         })
     }
-    // fn valid(&self) -> bool {
-    //     true
-    // }
+    fn validate(&self) -> Result<()> {
+        // Add metadata check here
+        Ok(())
+    }
+
     pub fn read(&self) -> Result<Vec<Task>> {
-        // match self.valid() {
-        //     true => None,
-        //     _ => None,
-        // }
+        self.validate()?;
 
         let mut file = fs::File::open(&self.path)?;
         let mut contents = String::new();
