@@ -1,3 +1,4 @@
+use crate::cache::Cache;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -79,20 +80,26 @@ pub struct Cli {
 
 // Config setup
 #[derive(Serialize, Deserialize)]
-pub struct GtdConfig {
+pub struct ProjwarriorConfig {
     pub storage_path: String,
     pub task_path: String,
     pub short: bool,
     pub color: bool,
+    pub use_cache: bool,
+    pub cache_length: u32,
+    pub cache: Option<Cache>,
 }
 
-impl ::std::default::Default for GtdConfig {
+impl ::std::default::Default for ProjwarriorConfig {
     fn default() -> Self {
         Self {
             task_path: get_task_bin(),
             storage_path: env::var("HOME").unwrap() + "/.local/share/projwarrior/projects.sqlite",
             short: false,
             color: true,
+            use_cache: true,
+            cache_length: 60,
+            cache: None,
         }
     }
 }
@@ -108,17 +115,22 @@ fn get_task_bin() -> String {
         .to_owned()
 }
 
-pub fn get_config(args: &Cli) -> GtdConfig {
+pub fn get_config(args: &Cli) -> ProjwarriorConfig {
     // Load config
-    let cfg: GtdConfig = confy::load("projwarrior", None).expect("Failed to load config");
+    let cfg: ProjwarriorConfig = confy::load("projwarrior", None).expect("Failed to load config");
+    let cache = match cfg.use_cache {
+        true => Cache::new(cfg.cache_length),
+        false => None,
+    };
     // Overwrite config file with CLI options
-    GtdConfig {
+    ProjwarriorConfig {
         short: if args.short || args.long {
             !args.long
         } else {
             cfg.short
         },
         color: if args.color { true } else { cfg.color },
+        cache,
         ..cfg
     }
 }

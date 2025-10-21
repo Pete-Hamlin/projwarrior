@@ -5,16 +5,36 @@ use std::process::Command;
 use std::str;
 use task_hookrs::status::TaskStatus;
 
-use crate::GtdConfig;
+use crate::ProjwarriorConfig;
 use task_hookrs::task::Task;
 
-pub fn get_task_list(cfg: &GtdConfig) -> Result<Vec<Task>, Box<dyn Error>> {
+pub fn get_task_list(cfg: &ProjwarriorConfig) -> Result<Vec<Task>, Box<dyn Error>> {
+    // Try reading from cache if enabled
+    if cfg.use_cache
+        && let Some(ref cache) = cfg.cache
+    {
+        match cache.read() {
+            Ok(tasks) => return Ok(tasks),
+            Err(err) => eprintln!("Failed to read cache: {err} — falling back to live export."),
+        }
+    }
+
+    // Fallback to live task export
     let tasks = parse_json_from_command::<Vec<Task>>(&cfg.task_path, &["export"])?;
-    let filtered_tasks = tasks
+
+    let filtered_tasks: Vec<Task> = tasks
         .into_iter()
         .filter(|t| t.project().is_some())
-        .filter(|t| t.status() == &TaskStatus::Pending || t.status() == &TaskStatus::Waiting)
+        .filter(|t| matches!(t.status(), TaskStatus::Pending | TaskStatus::Waiting))
         .collect();
+
+    if cfg.use_cache
+        && let Some(ref cache) = cfg.cache
+        && let Err(err) = cache.write(&filtered_tasks)
+    {
+        eprintln!("Failed to write to cache: {err}");
+    }
+
     Ok(filtered_tasks)
 }
 

@@ -3,7 +3,7 @@ use comfy_table::{Attribute, Cell, Color, Table};
 use serde::{Deserialize, Serialize};
 use task_hookrs::task::Task;
 
-use crate::config::GtdConfig;
+use crate::config::ProjwarriorConfig;
 use crate::project::Project;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,7 +50,7 @@ impl Column {
 }
 
 pub fn project_list_table(
-    cfg: &GtdConfig,
+    cfg: &ProjwarriorConfig,
     tasks: &[Task],
     projects: &[Project],
     columns: &[Column],
@@ -88,7 +88,7 @@ pub fn project_list_table(
     }
 }
 
-pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task]) {
+pub fn project_details_table(cfg: &ProjwarriorConfig, project: &Project, tasks: &[Task]) {
     let headers = vec!["Name", "Value"];
     let mut table = create_table(&headers);
     let color = if cfg.color {
@@ -116,7 +116,7 @@ pub fn project_details_table(cfg: &GtdConfig, project: &Project, tasks: &[Task])
     }
 }
 
-fn task_list_table(cfg: &GtdConfig, tasks: &[Task]) {
+fn task_list_table(cfg: &ProjwarriorConfig, tasks: &[Task]) {
     let headers = vec!["ID", "Entry", "Description", "Status", "Tags"];
     let mut table = create_table(&headers);
     for (index, item) in tasks.iter().enumerate() {

@@ -1,4 +1,5 @@
 #![recursion_limit = "1024"]
+mod cache;
 mod config;
 mod db;
 mod filters;
@@ -7,7 +8,7 @@ mod table;
 mod tasks;
 
 use clap::Parser;
-use config::{Cli, GtdConfig, get_config};
+use config::{Cli, ProjwarriorConfig, get_config};
 use db::DB;
 use project::{Project, State};
 use std::fs::remove_file;
@@ -30,6 +31,7 @@ fn main() -> Result<(), String> {
         Ok(_) => (),
         Err(error) => println!("Error connecting to the database: {:?}", error),
     };
+
     match args.command {
         Some(CommandType::Init) => init_projects(&cfg, &mut db),
         Some(CommandType::Reset) => reset_projects(&cfg),
@@ -43,7 +45,7 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
-fn init_projects(cfg: &GtdConfig, db: &mut DB) {
+fn init_projects(cfg: &ProjwarriorConfig, db: &mut DB) {
     let tasks = get_task_list(cfg).expect("Failed to get task list");
     let mut name_list: Vec<String> = vec![];
     tasks.into_iter().for_each(|task| {
@@ -67,14 +69,14 @@ fn init_projects(cfg: &GtdConfig, db: &mut DB) {
     }
 }
 
-fn reset_projects(cfg: &GtdConfig) {
+fn reset_projects(cfg: &ProjwarriorConfig) {
     match remove_file(&cfg.storage_path) {
         Ok(_p) => println!("Successfully removed project list"),
         Err(e) => println!("Failed to remove project list: {:?}", e),
     }
 }
 
-fn list_projects(cfg: &GtdConfig, db: &DB, subcommand: &Option<String>) {
+fn list_projects(cfg: &ProjwarriorConfig, db: &DB, subcommand: &Option<String>) {
     let tasks = get_task_list(cfg).expect("Failed to get task list");
     let state = match subcommand.as_deref() {
         Some("all") => None,
@@ -107,7 +109,7 @@ fn list_projects(cfg: &GtdConfig, db: &DB, subcommand: &Option<String>) {
     project_list_table(cfg, &tasks, &projects, &columns);
 }
 
-fn count_projects(cfg: &GtdConfig, db: &DB, args: &Cli) {
+fn count_projects(cfg: &ProjwarriorConfig, db: &DB, args: &Cli) {
     let tasks = get_task_list(cfg).expect("Failed to get task list");
     let state = match args.subcommand.as_deref() {
         Some("all") => None,
@@ -151,7 +153,12 @@ fn add_project(db: &mut DB, args: &Cli) {
     }
 }
 
-fn parse_filter(cfg: &GtdConfig, db: &DB, filter_enum: &FilterType, subcommand: &Option<String>) {
+fn parse_filter(
+    cfg: &ProjwarriorConfig,
+    db: &DB,
+    filter_enum: &FilterType,
+    subcommand: &Option<String>,
+) {
     let filters = match filter_enum {
         FilterType::ID(id) => ProjectFilter::builder().id(id),
         FilterType::Uuid(uuid) => ProjectFilter::builder().uuid(uuid),
@@ -195,7 +202,7 @@ fn parse_filter(cfg: &GtdConfig, db: &DB, filter_enum: &FilterType, subcommand: 
     }
 }
 
-fn show_project(cfg: &GtdConfig, project: &Project) {
+fn show_project(cfg: &ProjwarriorConfig, project: &Project) {
     let tasks = get_task_list(cfg).expect("Failed to get task list");
     let project_tasks: Vec<Task> = tasks
         .iter()
