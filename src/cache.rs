@@ -2,21 +2,23 @@ use std::{
     fs,
     io::{Read, Write},
     path::PathBuf,
+    time::SystemTime,
 };
 
 use anyhow::Result;
-// use chrono::{DateTime, Utc};
+use anyhow::anyhow;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use task_hookrs::task::Task;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Cache {
     path: PathBuf,
-    timeout: u32,
+    timeout: u64,
 }
 
 impl Cache {
-    pub fn new(timeout: u32) -> Option<Cache> {
+    pub fn new(timeout: u64) -> Option<Cache> {
         dirs::cache_dir().map(|path| {
             let cache_dir = path.join("projwarrior");
             fs::create_dir_all(&cache_dir).expect("Error creating cache dir");
@@ -28,7 +30,13 @@ impl Cache {
     }
     fn validate(&self) -> Result<()> {
         // Add metadata check here
-        Ok(())
+        let metadata = fs::metadata(&self.path)?;
+        let now = SystemTime::now();
+        let last_updated = metadata.modified()?;
+        if now.duration_since(last_updated)?.as_secs() < self.timeout {
+            return Ok(());
+        }
+        Err(anyhow!("Cache invalid - Refresh required"))
     }
 
     pub fn read(&self) -> Result<Vec<Task>> {

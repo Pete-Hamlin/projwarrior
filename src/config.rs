@@ -86,7 +86,7 @@ pub struct ProjwarriorConfig {
     pub short: bool,
     pub color: bool,
     pub use_cache: bool,
-    pub cache_length: u32,
+    pub cache_length: u64,
     pub cache: Option<Cache>,
 }
 
