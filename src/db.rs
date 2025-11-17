@@ -45,11 +45,11 @@ impl DB {
         Ok(())
     }
 
-    pub fn reset(&self) -> Result<()> {
-        println!("Dropping projects db...");
-        self.conn.execute("DROP TABLE IF EXISTS project", [])?;
-        Ok(())
-    }
+    // pub fn reset(&self) -> Result<()> {
+    //     println!("Dropping projects db...");
+    //     self.conn.execute("DROP TABLE IF EXISTS project", [])?;
+    //     Ok(())
+    // }
 
     /// Rebuilds the 'working set' indexes for pending projects.
     ///
@@ -174,12 +174,6 @@ impl DB {
         Ok(projects)
     }
 }
-
-// pub fn get_single_project(cfg: &GtdConfig, project_id: u32) -> Result<Project> {
-//     let conn = Connection::open(&cfg.storage_path)?;
-//     let query = "SELECT uuid, id, name, state FROM project WHERE id = ?";
-//     Ok(())
-// }
 
 #[cfg(test)]
 mod tests {
