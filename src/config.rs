@@ -69,6 +69,14 @@ pub struct Cli {
     #[clap(short, long)]
     pub long: bool,
 
+    /// Force a refresh of the cache file
+    #[clap(short, long)]
+    pub refresh: bool,
+
+    /// Disable cache entirely for this run
+    #[clap(short, long)]
+    pub no_cache: bool,
+
     /// Display only projects without tasks
     #[clap(short, long)]
     pub short: bool,
@@ -119,7 +127,7 @@ pub fn get_config(args: &Cli) -> ProjwarriorConfig {
     // Load config
     let cfg: ProjwarriorConfig = confy::load("projwarrior", None).expect("Failed to load config");
     let cache = match cfg.use_cache {
-        true => Cache::new(cfg.cache_length),
+        true => Cache::new(cfg.cache_length, dirs::cache_dir(), args.refresh),
         false => None,
     };
     // Overwrite config file with CLI options
@@ -129,8 +137,8 @@ pub fn get_config(args: &Cli) -> ProjwarriorConfig {
         } else {
             cfg.short
         },
+        cache: if args.no_cache { None } else { cache },
         color: if args.color { true } else { cfg.color },
-        cache,
         ..cfg
     }
 }

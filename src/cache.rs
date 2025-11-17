@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::Result;
 use anyhow::anyhow;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use task_hookrs::task::Task;
 
@@ -18,16 +17,21 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn new(timeout: u64) -> Option<Cache> {
-        dirs::cache_dir().map(|path| {
+    pub fn new(timeout: u64, cache_path: Option<PathBuf>, refresh: bool) -> Option<Cache> {
+        cache_path.map(|path| {
             let cache_dir = path.join("projwarrior");
             fs::create_dir_all(&cache_dir).expect("Error creating cache dir");
+            let cache_file = cache_dir.join("tasks.json");
+            if refresh && cache_file.exists() {
+                fs::remove_file(&cache_file).expect("Error clearing cache file");
+            }
             Cache {
-                path: cache_dir.join("tasks.json"),
+                path: cache_file,
                 timeout,
             }
         })
     }
+
     fn validate(&self) -> Result<()> {
         // Add metadata check here
         let metadata = fs::metadata(&self.path)?;
