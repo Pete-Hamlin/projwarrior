@@ -16,12 +16,13 @@ confy = { version = "0.6.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 comfy-table = "7.1.4"
-rusqlite = { version = "0.36.0", features = [ "bundled", "uuid" ] }
+rusqlite = { version = "0.37.0", features = [ "bundled", "uuid" ] }
 uuid = { version = "1.15.1", features = ["v4", "serde"] }
 task-hookrs = "0.9.0"
 chrono = {version = "0.4.41", features = ["serde"]}
 anyhow = "1.0.100"
 dirs = "6.0.0"
+taskchampion = { version = "3.0.1"  }
 
 
 [profile.release]
@@ -31,4 +32,4 @@ panic = 'abort'   # Abort on panic
 strip = true      # Strip symbols from binary
 
 [dev-dependencies]
-tempfile = "3.19.1"
+tempfile = "3.24.0"
