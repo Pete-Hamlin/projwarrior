@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::filters::ProjectFilter;
 use crate::project::{Project, State};
 use chrono::Utc;
@@ -10,7 +12,7 @@ pub struct DB {
 }
 
 impl DB {
-    pub fn new(storage_path: &str) -> Result<DB> {
+    pub fn new(storage_path: &PathBuf) -> Result<DB> {
         Ok(DB {
             conn: Connection::open(storage_path)?,
         })

@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde_json::from_str;
 use std::error::Error;
+use std::path::PathBuf;
 use std::process::Command;
 use std::str;
 use task_hookrs::status::TaskStatus;
@@ -38,7 +39,7 @@ pub fn get_task_list(cfg: &ProjwarriorConfig) -> Result<Vec<Task>, Box<dyn Error
     Ok(filtered_tasks)
 }
 
-pub fn parse_json_from_command<T>(command: &str, args: &[&str]) -> Result<T, Box<dyn Error>>
+pub fn parse_json_from_command<T>(command: &PathBuf, args: &[&str]) -> Result<T, Box<dyn Error>>
 where
     T: for<'de> Deserialize<'de>,
 {

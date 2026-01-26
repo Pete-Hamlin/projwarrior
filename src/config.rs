@@ -1,7 +1,9 @@
 use crate::cache::Cache;
+use crate::error::ConfigError;
 use clap::Parser;
+use dirs::data_dir;
 use serde::{Deserialize, Serialize};
-use std::env;
+use std::path::PathBuf;
 use std::process::Command;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -89,8 +91,8 @@ pub struct Cli {
 // Config setup
 #[derive(Serialize, Deserialize)]
 pub struct ProjwarriorConfig {
-    pub storage_path: String,
-    pub task_path: String,
+    pub storage_path: PathBuf,
+    pub task_path: PathBuf,
     pub short: bool,
     pub color: bool,
     pub use_cache: bool,
@@ -100,9 +102,14 @@ pub struct ProjwarriorConfig {
 
 impl ::std::default::Default for ProjwarriorConfig {
     fn default() -> Self {
+        let task_path = get_task_bin().unwrap();
+        let storage_path = PathBuf::from_iter([
+            data_dir().unwrap(),
+            PathBuf::from_str("projwarrior/projects.sqlite").unwrap(),
+        ]);
         Self {
-            task_path: get_task_bin(),
-            storage_path: env::var("HOME").unwrap() + "/.local/share/projwarrior/projects.sqlite",
+            task_path,
+            storage_path,
             short: false,
             color: true,
             use_cache: true,
@@ -112,15 +119,20 @@ impl ::std::default::Default for ProjwarriorConfig {
     }
 }
 
-fn get_task_bin() -> String {
+fn get_task_bin() -> Result<PathBuf, ConfigError> {
     // Check if `task` in current path
-    let task_bin = Command::new("which").arg("task").output().expect(
-        "Failed to find task binary - please ensure the `task` command is available in your $PATH",
-    );
-    String::from_utf8(task_bin.stdout)
-        .unwrap()
-        .trim()
-        .to_owned()
+    let task_bin = match Command::new("which").arg("task").output() {
+        Ok(task) => task,
+        Err(_) => {
+            return Err(ConfigError::NoTask);
+        }
+    };
+    Ok(PathBuf::from(
+        String::from_utf8(task_bin.stdout)
+            .unwrap()
+            .trim()
+            .to_owned(),
+    ))
 }
 
 pub fn get_config(args: &Cli) -> ProjwarriorConfig {

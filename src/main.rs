@@ -2,6 +2,7 @@
 mod cache;
 mod config;
 mod db;
+mod error;
 mod filters;
 mod project;
 mod table;
@@ -42,11 +43,13 @@ fn main() -> Result<(), String> {
         // Default behaviour - just display list and exit
         None => list_projects(&cfg, &db, &args.subcommand),
     }
-    Ok(())
 }
 
-fn init_projects(cfg: &ProjwarriorConfig, db: &mut DB) {
-    let tasks = get_task_list(cfg).expect("Failed to get task list");
+fn init_projects(cfg: &ProjwarriorConfig, db: &mut DB) -> Result<(), String> {
+    let tasks = match get_task_list(cfg) {
+        Ok(tasks) => tasks,
+        Err(e) => return Err(format!("Unable to retrieve task list - {e:?}")),
+    };
     let mut name_list: Vec<String> = vec![];
     tasks.into_iter().for_each(|task| {
         let project_name = task.project().unwrap();
@@ -65,19 +68,28 @@ fn init_projects(cfg: &ProjwarriorConfig, db: &mut DB) {
         .collect();
     match db.insert_projects(&projects) {
         Ok(_p) => println!("Successfully initialized project list - {total:?} projects added"),
-        Err(e) => println!("Failed to write project list: {e:?}"),
+        Err(e) => return Err(format!("Failed to write project list: {e:?}")),
     }
+    Ok(())
 }
 
-fn reset_projects(cfg: &ProjwarriorConfig) {
+fn reset_projects(cfg: &ProjwarriorConfig) -> Result<(), String> {
     match remove_file(&cfg.storage_path) {
         Ok(_p) => println!("Successfully removed project list"),
-        Err(e) => println!("Failed to remove project list: {:?}", e),
+        Err(e) => return Err(format!("Failed to remove project list: {e:?}")),
     }
+    Ok(())
 }
 
-fn list_projects(cfg: &ProjwarriorConfig, db: &DB, subcommand: &Option<String>) {
-    let tasks = get_task_list(cfg).expect("Failed to get task list");
+fn list_projects(
+    cfg: &ProjwarriorConfig,
+    db: &DB,
+    subcommand: &Option<String>,
+) -> Result<(), String> {
+    let tasks = match get_task_list(cfg) {
+        Ok(tasks) => tasks,
+        Err(e) => return Err(format!("Unable to retrieve task list - {e:?}")),
+    };
     let state = match subcommand.as_deref() {
         Some("all") => None,
         Some("incubate") => Some(&State::Incubate),
@@ -89,9 +101,10 @@ fn list_projects(cfg: &ProjwarriorConfig, db: &DB, subcommand: &Option<String>) 
         None => ProjectFilter::builder().build(),
     };
 
-    let projects = db
-        .get_projects(&filters)
-        .expect("Failed to retrieve project list");
+    let projects = match db.get_projects(&filters) {
+        Ok(proj_list) => proj_list,
+        Err(e) => return Err(format!("Failed to retrieve project list - {e:?}")),
+    };
 
     let columns = match state {
         Some(&State::Complete) => vec![Column::Uuid, Column::Name, Column::Tasks, Column::Entry],
@@ -107,10 +120,14 @@ fn list_projects(cfg: &ProjwarriorConfig, db: &DB, subcommand: &Option<String>) 
     };
 
     project_list_table(cfg, &tasks, &projects, &columns);
+    Ok(())
 }
 
-fn count_projects(cfg: &ProjwarriorConfig, db: &DB, args: &Cli) {
-    let tasks = get_task_list(cfg).expect("Failed to get task list");
+fn count_projects(cfg: &ProjwarriorConfig, db: &DB, args: &Cli) -> Result<(), String> {
+    let tasks = match get_task_list(cfg) {
+        Ok(tasks) => tasks,
+        Err(e) => return Err(format!("Unable to retrieve task list - {e:?}")),
+    };
     let state = match args.subcommand.as_deref() {
         Some("all") => None,
         Some("incubate") => Some(&State::Incubate),
@@ -121,9 +138,11 @@ fn count_projects(cfg: &ProjwarriorConfig, db: &DB, args: &Cli) {
         Some(filter) => ProjectFilter::builder().state(filter).build(),
         None => ProjectFilter::builder().build(),
     };
-    let projects = db
-        .get_projects(&filters)
-        .expect("Failed to retrieve project list");
+
+    let projects = match db.get_projects(&filters) {
+        Ok(proj_list) => proj_list,
+        Err(e) => return Err(format!("Failed to retrieve project list - {e:?}")),
+    };
 
     if !cfg.short {
         let count = projects.len();
@@ -135,9 +154,10 @@ fn count_projects(cfg: &ProjwarriorConfig, db: &DB, args: &Cli) {
             .count();
         println!("{:?}", count)
     }
+    Ok(())
 }
 
-fn add_project(db: &mut DB, args: &Cli) {
+fn add_project(db: &mut DB, args: &Cli) -> Result<(), String> {
     if let Some(subcommand) = args.subcommand.as_deref() {
         let project = vec![Project {
             name: subcommand.to_string(),
@@ -146,11 +166,12 @@ fn add_project(db: &mut DB, args: &Cli) {
         }];
         match db.insert_projects(&project) {
             Ok(_p) => println!("Successfully added project {:?}", subcommand.to_string()),
-            Err(e) => println!("Failed to add project {:?}", e),
+            Err(e) => return Err(format!("Failed to add project {e:?}")),
         }
     } else {
         println!("No task specified - run `proj --help` for guidance on running this command")
     }
+    Ok(())
 }
 
 fn parse_filter(
@@ -158,7 +179,7 @@ fn parse_filter(
     db: &DB,
     filter_enum: &FilterType,
     subcommand: &Option<String>,
-) {
+) -> Result<(), String> {
     let filters = match filter_enum {
         FilterType::ID(id) => ProjectFilter::builder().id(id),
         FilterType::Uuid(uuid) => ProjectFilter::builder().uuid(uuid),
@@ -170,9 +191,10 @@ fn parse_filter(
 
     if projects.len() > 1 {
         let tasks = get_task_list(cfg).expect("Failed to get task list");
-        let projects = db
-            .get_projects(&query)
-            .expect("Failed to retrieve project list");
+        let projects = match db.get_projects(&query) {
+            Ok(projects) => projects,
+            Err(e) => return Err(format!("Unable to query project list - {e:?}")),
+        };
         project_list_table(
             cfg,
             &tasks,
@@ -182,9 +204,7 @@ fn parse_filter(
     } else {
         let project = match db.get_projects(&query) {
             Ok(p) => p.into_iter().next().unwrap(),
-            Err(_) => {
-                return;
-            }
+            Err(e) => return Err(format!("Unable to parse project entity - {e:?}")),
         };
         if let Some(subcommand) = subcommand.as_deref() {
             match subcommand {
@@ -193,13 +213,14 @@ fn parse_filter(
                 "incubate" => mark_project_incubate(db, &project),
                 "pending" => mark_project_pending(db, &project),
                 "delete" => delete_project_item(db, &project),
-                _ => println!("Subcommand {subcommand} not found"),
-            }
+                _ => return Err(format!("Subcommand {subcommand} not found")),
+            };
         } else {
             // If no subcommand, just show project details
-            show_project(cfg, &project)
+            show_project(cfg, &project);
         }
     }
+    Ok(())
 }
 
 fn show_project(cfg: &ProjwarriorConfig, project: &Project) {
