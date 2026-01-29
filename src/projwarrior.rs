@@ -1,3 +1,5 @@
+use std::fs::remove_file;
+
 use chrono::Utc;
 use futures::executor::block_on;
 use task_hookrs::task::Task;
@@ -23,7 +25,7 @@ impl Projchampion {
         Ok(Projchampion { conf, replica })
     }
 
-    pub async fn init_projects(&mut self) -> Result<(), ProjChampionError> {
+    pub async fn init_projects(&mut self) -> Result<String, ProjChampionError> {
         let tasks = self.get_tasks()?;
         let mut name_list: Vec<String> = vec![];
         tasks.into_iter().for_each(|task| {
@@ -32,15 +34,26 @@ impl Projchampion {
                 name_list.push(project_name.clone());
             }
         });
+        let proj_count = name_list.len();
         let mut ops = Operations::new();
         for name in name_list {
-            block_on(self.add_project(&name, &mut ops))?;
+            self.add_project(&name, &mut ops).await?;
         }
         self.replica.commit_operations(ops).await?;
-        Ok(())
+        Ok(format!("Successfully initialized {proj_count} projects"))
     }
-    pub async fn list_projects(&mut self, _: &Option<String>) -> Result<(), ProjChampionError> {
+
+    pub fn reset_projects(&self) -> Result<String, ProjChampionError> {
+        match remove_file(&self.conf.storage_path) {
+            Ok(_) => Ok("Successfully removed project list".to_string()),
+            Err(_) => Err(ProjChampionError::FileSystemError),
+        }
+    }
+
+    pub async fn list_projects(&mut self, _: &Option<String>) -> Result<String, ProjChampionError> {
         let _ = self.get_tasks()?;
+        let projects = self.replica.all_tasks().await?;
+        let proj_len = projects.len();
 
         // let state = match subcommand.as_deref() {
         //     Some("all") => None,
@@ -48,7 +61,20 @@ impl Projchampion {
         //     Some("done") => Some(&State::Complete),
         //     _ => Some(&State::Pending),
         // };
-        Ok(())
+
+        Ok(format!("Processed {proj_len} projects"))
+    }
+
+    pub async fn count_projects(
+        &mut self,
+        _: &Option<String>,
+    ) -> Result<String, ProjChampionError> {
+        let _ = self.get_tasks()?;
+        let projects = self.replica.all_task_uuids().await?;
+        let proj_len = projects.len();
+        // TODO: Add filtering
+
+        Ok(format!("{proj_len}"))
     }
     async fn add_project(
         &mut self,

@@ -21,23 +21,26 @@ impl Error for ConfigError {}
 
 #[derive(PartialEq, Debug)]
 pub enum ProjChampionError {
-    ReplicaError,
+    ReplicaError(String),
     TaskError,
+    FileSystemError,
+    OtherError,
 }
 
 impl fmt::Display for ProjChampionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let description = match *self {
-            ProjChampionError::ReplicaError => "Failed to setup replica.",
-            ProjChampionError::TaskError => "Error querying taskwarrior",
-        };
-        f.write_str(description)
+        match self {
+            ProjChampionError::ReplicaError(e) => write!(f, "Unable to setup replica: {e}"),
+            ProjChampionError::TaskError => write!(f, "Error querying taskwarrior"),
+            ProjChampionError::FileSystemError => write!(f, "Filesystem error, check permissions"),
+            ProjChampionError::OtherError => write!(f, "An error has occured"),
+        }
     }
 }
 
 impl Error for ProjChampionError {}
 impl From<taskchampion::Error> for ProjChampionError {
-    fn from(_: taskchampion::Error) -> Self {
-        Self::ReplicaError
+    fn from(err: taskchampion::Error) -> Self {
+        Self::ReplicaError(err.to_string())
     }
 }

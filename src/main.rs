@@ -10,11 +10,10 @@ mod table;
 mod tasks;
 
 use clap::Parser;
-use config::{Cli, ProjwarriorConfig, get_config};
+use config::{Cli, ProjwarriorConfig};
 use db::DB;
 use futures::executor::block_on;
 use project::{Project, State};
-use std::{error::Error, fs::remove_file};
 use table::{project_details_table, project_list_table};
 use task_hookrs::task::Task;
 use tasks::get_task_list;
@@ -33,111 +32,28 @@ fn main() -> Result<(), String> {
 
     let mut pc = match block_on(Projchampion::new(&args)) {
         Ok(pc) => pc,
-        Err(e) => return Err(format!("Unable to initialize projchampion - {e:?}")),
+        Err(e) => return Err(format!("Error: Unable to initialize projchampion - {e:?}")),
     };
 
     match block_on(match_arg(&args, &mut pc)) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Unable to initialize projchampion - {e:?}")),
-    }
+        Ok(result) => println!("{result}"),
+        Err(e) => println!("Error: {e:?}"),
+    };
+    Ok(())
 }
 
-async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<(), ProjChampionError> {
+async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<String, ProjChampionError> {
     match args.command {
         Some(CommandType::Init) => pc.init_projects().await,
-        // Some(CommandType::Reset) => reset_projects(&cfg),
-        // Some(CommandType::List) => list_projects(&cfg, &db, &args.subcommand),
-        // Some(CommandType::Count) => count_projects(&cfg, &db, &args),
+        Some(CommandType::Reset) => pc.reset_projects(),
+        Some(CommandType::List) => pc.list_projects(&args.subcommand).await,
+        Some(CommandType::Count) => pc.count_projects(&args.subcommand).await,
         // Some(CommandType::Add) => add_project(&mut db, &args),
         // Some(CommandType::Query(arg)) => parse_filter(&cfg, &db, &arg, &args.subcommand),
         // Default behaviour - just display list and exit
         // None => list_projects(&cfg, &db, &args.subcommand),
         _ => pc.list_projects(&args.subcommand).await,
     }
-}
-
-fn reset_projects(cfg: &ProjwarriorConfig) -> Result<(), String> {
-    match remove_file(&cfg.storage_path) {
-        Ok(_p) => println!("Successfully removed project list"),
-        Err(e) => return Err(format!("Failed to remove project list: {e:?}")),
-    }
-    Ok(())
-}
-
-fn list_projects(
-    cfg: &ProjwarriorConfig,
-    db: &DB,
-    subcommand: &Option<String>,
-) -> Result<(), String> {
-    let tasks = match get_task_list(cfg) {
-        Ok(tasks) => tasks,
-        Err(e) => return Err(format!("Unable to retrieve task list - {e:?}")),
-    };
-    let state = match subcommand.as_deref() {
-        Some("all") => None,
-        Some("incubate") => Some(&State::Incubate),
-        Some("done") => Some(&State::Complete),
-        _ => Some(&State::Pending),
-    };
-    let filters = match state {
-        Some(filter) => ProjectFilter::builder().state(filter).build(),
-        None => ProjectFilter::builder().build(),
-    };
-
-    let projects = match db.get_projects(&filters) {
-        Ok(proj_list) => proj_list,
-        Err(e) => return Err(format!("Failed to retrieve project list - {e:?}")),
-    };
-
-    let columns = match state {
-        Some(&State::Complete) => vec![Column::Uuid, Column::Name, Column::Tasks, Column::Entry],
-        Some(_) => vec![Column::Id, Column::Name, Column::Tasks, Column::Entry],
-        None => vec![
-            Column::Id,
-            Column::Uuid,
-            Column::State,
-            Column::Name,
-            Column::Tasks,
-            Column::Entry,
-        ],
-    };
-
-    project_list_table(cfg, &tasks, &projects, &columns);
-    Ok(())
-}
-
-fn count_projects(cfg: &ProjwarriorConfig, db: &DB, args: &Cli) -> Result<(), String> {
-    let tasks = match get_task_list(cfg) {
-        Ok(tasks) => tasks,
-        Err(e) => return Err(format!("Unable to retrieve task list - {e:?}")),
-    };
-    let state = match args.subcommand.as_deref() {
-        Some("all") => None,
-        Some("incubate") => Some(&State::Incubate),
-        Some("done") => Some(&State::Complete),
-        _ => Some(&State::Pending),
-    };
-    let filters = match state {
-        Some(filter) => ProjectFilter::builder().state(filter).build(),
-        None => ProjectFilter::builder().build(),
-    };
-
-    let projects = match db.get_projects(&filters) {
-        Ok(proj_list) => proj_list,
-        Err(e) => return Err(format!("Failed to retrieve project list - {e:?}")),
-    };
-
-    if !cfg.short {
-        let count = projects.len();
-        println!("{:?}", count)
-    } else {
-        let count = projects
-            .into_iter()
-            .filter(|p| p.get_tasks(&tasks) == 0)
-            .count();
-        println!("{:?}", count)
-    }
-    Ok(())
 }
 
 fn add_project(db: &mut DB, args: &Cli) -> Result<(), String> {
