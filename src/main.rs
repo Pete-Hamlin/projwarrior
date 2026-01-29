@@ -5,14 +5,16 @@ mod db;
 mod error;
 mod filters;
 mod project;
+mod projwarrior;
 mod table;
 mod tasks;
 
 use clap::Parser;
 use config::{Cli, ProjwarriorConfig, get_config};
 use db::DB;
+use futures::executor::block_on;
 use project::{Project, State};
-use std::fs::remove_file;
+use std::{error::Error, fs::remove_file};
 use table::{project_details_table, project_list_table};
 use task_hookrs::task::Task;
 use tasks::get_task_list;
@@ -20,57 +22,38 @@ use uuid::Uuid;
 
 use crate::{
     config::{CommandType, FilterType},
+    error::ProjChampionError,
     filters::ProjectFilter,
+    projwarrior::Projchampion,
     table::Column,
 };
 
 fn main() -> Result<(), String> {
     let args = Cli::parse();
-    let cfg = get_config(&args);
-    let mut db = DB::new(&cfg.storage_path).unwrap();
-    match db.check() {
-        Ok(_) => (),
-        Err(error) => println!("Error connecting to the database: {:?}", error),
+
+    let mut pc = match block_on(Projchampion::new(&args)) {
+        Ok(pc) => pc,
+        Err(e) => return Err(format!("Unable to initialize projchampion - {e:?}")),
     };
 
-    match args.command {
-        Some(CommandType::Init) => init_projects(&cfg, &mut db),
-        Some(CommandType::Reset) => reset_projects(&cfg),
-        Some(CommandType::List) => list_projects(&cfg, &db, &args.subcommand),
-        Some(CommandType::Count) => count_projects(&cfg, &db, &args),
-        Some(CommandType::Add) => add_project(&mut db, &args),
-        Some(CommandType::Query(arg)) => parse_filter(&cfg, &db, &arg, &args.subcommand),
-        // Default behaviour - just display list and exit
-        None => list_projects(&cfg, &db, &args.subcommand),
+    match block_on(match_arg(&args, &mut pc)) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Unable to initialize projchampion - {e:?}")),
     }
 }
 
-fn init_projects(cfg: &ProjwarriorConfig, db: &mut DB) -> Result<(), String> {
-    let tasks = match get_task_list(cfg) {
-        Ok(tasks) => tasks,
-        Err(e) => return Err(format!("Unable to retrieve task list - {e:?}")),
-    };
-    let mut name_list: Vec<String> = vec![];
-    tasks.into_iter().for_each(|task| {
-        let project_name = task.project().unwrap();
-        if !name_list.contains(project_name) {
-            name_list.push(project_name.clone());
-        }
-    });
-    let total = name_list.len();
-    let projects: Vec<Project> = name_list
-        .into_iter()
-        .map(|name| Project {
-            name,
-            uuid: Uuid::new_v4(),
-            ..Default::default()
-        })
-        .collect();
-    match db.insert_projects(&projects) {
-        Ok(_p) => println!("Successfully initialized project list - {total:?} projects added"),
-        Err(e) => return Err(format!("Failed to write project list: {e:?}")),
+async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<(), ProjChampionError> {
+    match args.command {
+        Some(CommandType::Init) => pc.init_projects().await,
+        // Some(CommandType::Reset) => reset_projects(&cfg),
+        // Some(CommandType::List) => list_projects(&cfg, &db, &args.subcommand),
+        // Some(CommandType::Count) => count_projects(&cfg, &db, &args),
+        // Some(CommandType::Add) => add_project(&mut db, &args),
+        // Some(CommandType::Query(arg)) => parse_filter(&cfg, &db, &arg, &args.subcommand),
+        // Default behaviour - just display list and exit
+        // None => list_projects(&cfg, &db, &args.subcommand),
+        _ => pc.list_projects(&args.subcommand).await,
     }
-    Ok(())
 }
 
 fn reset_projects(cfg: &ProjwarriorConfig) -> Result<(), String> {
