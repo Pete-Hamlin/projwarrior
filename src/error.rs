@@ -25,6 +25,7 @@ pub enum ProjChampionError {
     TaskList,
     FileSystem,
     NoProj,
+    SubCommand(String),
     Other,
 }
 
@@ -35,6 +36,7 @@ impl fmt::Display for ProjChampionError {
             ProjChampionError::TaskList => write!(f, "Error querying taskwarrior"),
             ProjChampionError::FileSystem => write!(f, "Filesystem error, check permissions"),
             ProjChampionError::NoProj => write!(f, "No project specified"),
+            ProjChampionError::SubCommand(e) => write!(f, "Subcommand {e} not valid."),
             ProjChampionError::Other => write!(f, "An error has occured"),
         }
     }

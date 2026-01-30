@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use chrono::{DateTime, Utc};
 use comfy_table::presets::NOTHING;
 use comfy_table::{Attribute, Cell, Color, Table};
@@ -8,7 +6,6 @@ use taskchampion::{Status, WorkingSet};
 use uuid::Uuid;
 
 use crate::config::ProjwarriorConfig;
-use crate::project::Project;
 
 #[derive(Debug)]
 pub struct ProjectTableItem {
@@ -34,7 +31,7 @@ impl Column {
         match self {
             Column::Id => "ID",
             Column::Uuid => "UUID",
-            Column::Name => "Name",
+            Column::Name => "Description",
             Column::Status => "Status",
             Column::Tasks => "Tasks",
             Column::Entry => "Entry",
@@ -103,7 +100,12 @@ pub fn project_list_table(
     }
 }
 
-pub fn project_details_table(cfg: &ProjwarriorConfig, project: &Project, tasks: &[Task]) {
+pub fn project_details_table(
+    cfg: &ProjwarriorConfig,
+    project: &taskchampion::Task,
+    tasks: &[Task],
+    id: Option<usize>,
+) {
     let headers = vec!["Name", "Value"];
     let mut table = create_table(&headers);
     let color = if cfg.color {
@@ -111,20 +113,24 @@ pub fn project_details_table(cfg: &ProjwarriorConfig, project: &Project, tasks: 
     } else {
         Color::Reset
     };
-    table.add_row(vec![Cell::new("Name"), Cell::new(&project.name).fg(color)]);
     table.add_row(vec![
         Cell::new("ID"),
-        Cell::new(match &project.id {
+        Cell::new(match id {
             Some(id) => id.to_string(),
             None => "-".to_string(),
         }),
     ]);
-    table.add_row(vec![Cell::new("UUID"), Cell::new(project.uuid)]);
+    table.add_row(vec![Cell::new("UUID"), Cell::new(project.get_uuid())]);
+    table.add_row(vec![
+        Cell::new("Description"),
+        Cell::new(project.get_description()).fg(color),
+    ]);
     table.add_row(vec![
         Cell::new("Status"),
-        Cell::new(format!("{:?}", &project.state)),
+        Cell::new(format!("{:?}", &project.get_status())),
     ]);
 
+    println!("{table}");
     if !tasks.is_empty() {
         task_list_table(cfg, tasks);
     }
