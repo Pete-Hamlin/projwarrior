@@ -48,29 +48,12 @@ async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<String, ProjCham
         Some(CommandType::Reset) => pc.reset_projects(),
         Some(CommandType::List) => pc.list_projects(&args.subcommand).await,
         Some(CommandType::Count) => pc.count_projects(&args.subcommand).await,
-        // Some(CommandType::Add) => add_project(&mut db, &args),
+        Some(CommandType::Add) => pc.add_project(&args.subcommand).await,
         // Some(CommandType::Query(arg)) => parse_filter(&cfg, &db, &arg, &args.subcommand),
         // Default behaviour - just display list and exit
         // None => list_projects(&cfg, &db, &args.subcommand),
         _ => pc.list_projects(&args.subcommand).await,
     }
-}
-
-fn add_project(db: &mut DB, args: &Cli) -> Result<(), String> {
-    if let Some(subcommand) = args.subcommand.as_deref() {
-        let project = vec![Project {
-            name: subcommand.to_string(),
-            uuid: Uuid::new_v4(),
-            ..Default::default()
-        }];
-        match db.insert_projects(&project) {
-            Ok(_p) => println!("Successfully added project {:?}", subcommand.to_string()),
-            Err(e) => return Err(format!("Failed to add project {e:?}")),
-        }
-    } else {
-        println!("No task specified - run `proj --help` for guidance on running this command")
-    }
-    Ok(())
 }
 
 fn parse_filter(

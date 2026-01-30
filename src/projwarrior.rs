@@ -1,7 +1,6 @@
 use std::fs::remove_file;
 
 use chrono::Utc;
-use futures::executor::block_on;
 use task_hookrs::task::Task;
 use taskchampion::{Operations, Replica, SqliteStorage, storage::AccessMode};
 use uuid::Uuid;
@@ -37,7 +36,7 @@ impl Projchampion {
         let proj_count = name_list.len();
         let mut ops = Operations::new();
         for name in name_list {
-            self.add_project(&name, &mut ops).await?;
+            self.init_proj(&name, &mut ops).await?;
         }
         self.replica.commit_operations(ops).await?;
         Ok(format!("Successfully initialized {proj_count} projects"))
@@ -46,7 +45,7 @@ impl Projchampion {
     pub fn reset_projects(&self) -> Result<String, ProjChampionError> {
         match remove_file(&self.conf.storage_path) {
             Ok(_) => Ok("Successfully removed project list".to_string()),
-            Err(_) => Err(ProjChampionError::FileSystemError),
+            Err(_) => Err(ProjChampionError::FileSystem),
         }
     }
 
@@ -76,7 +75,22 @@ impl Projchampion {
 
         Ok(format!("{proj_len}"))
     }
-    async fn add_project(
+
+    pub async fn add_project(
+        &mut self,
+        subcommand: &Option<String>,
+    ) -> Result<String, ProjChampionError> {
+        if let Some(name) = subcommand.as_deref() {
+            let mut ops = Operations::new();
+            self.init_proj(name, &mut ops).await?;
+            self.replica.commit_operations(ops).await?;
+            Ok(format!("Successfully added project {name}"))
+        } else {
+            Err(ProjChampionError::NoProj)
+        }
+    }
+
+    async fn init_proj(
         &mut self,
         name: &str,
         ops: &mut Operations,
@@ -92,7 +106,7 @@ impl Projchampion {
     fn get_tasks(&self) -> Result<Vec<Task>, ProjChampionError> {
         match get_task_list(&self.conf) {
             Ok(tasks) => Ok(tasks),
-            Err(_) => Err(ProjChampionError::TaskError),
+            Err(_) => Err(ProjChampionError::TaskList),
         }
     }
 }
