@@ -1,23 +1,31 @@
+use std::collections::HashMap;
+
+use chrono::{DateTime, Utc};
 use comfy_table::presets::NOTHING;
 use comfy_table::{Attribute, Cell, Color, Table};
-use serde::{Deserialize, Serialize};
 use task_hookrs::task::Task;
+use taskchampion::{Status, WorkingSet};
+use uuid::Uuid;
 
 use crate::config::ProjwarriorConfig;
+use crate::error::ProjChampionError;
 use crate::project::Project;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct ProjectTableItem {
-    pub project: Project,
+    pub name: String,
+    pub id: Option<usize>,
+    pub uuid: Uuid,
+    pub status: Status,
     pub tasks: i32,
+    pub entry: Option<DateTime<Utc>>,
 }
 
 pub enum Column {
     Id,
     Uuid,
     Name,
-    State,
+    Status,
     Tasks,
     Entry,
 }
@@ -28,7 +36,7 @@ impl Column {
             Column::Id => "ID",
             Column::Uuid => "UUID",
             Column::Name => "Name",
-            Column::State => "Status",
+            Column::Status => "Status",
             Column::Tasks => "Tasks",
             Column::Entry => "Entry",
         }
@@ -36,15 +44,18 @@ impl Column {
 
     fn row(&self, item: &ProjectTableItem) -> String {
         match self {
-            Column::Id => match item.project.id {
+            Column::Id => match item.id {
                 Some(id) => id.to_string(),
                 None => "-".to_string(),
             },
-            Column::Uuid => item.project.uuid.to_string(),
-            Column::Name => item.project.name.to_string(),
-            Column::State => item.project.state.to_string(),
+            Column::Uuid => item.uuid.to_string(),
+            Column::Name => item.name.to_string(),
+            Column::Status => item.status.to_string(),
             Column::Tasks => item.tasks.to_string(),
-            Column::Entry => item.project.created_at.format("%Y-%m-%d").to_string(),
+            Column::Entry => match item.entry {
+                Some(entry) => entry.format("%Y-%m-%d").to_string(),
+                None => "-".to_string(),
+            },
         }
     }
 }
@@ -52,13 +63,18 @@ impl Column {
 pub fn project_list_table(
     cfg: &ProjwarriorConfig,
     tasks: &[Task],
-    projects: &[Project],
+    projects: &HashMap<Uuid, taskchampion::Task>,
+    working_set: &WorkingSet,
     columns: &[Column],
 ) {
-    // let headers = vec!["ID", "Name", "Tasks", "Entry"];
     let headers: Vec<&str> = columns.iter().map(|col| col.header()).collect();
     let mut table = create_table(&headers);
-    let mut output = generate_project_list(tasks, projects);
+
+    // let mut output = generate_project_list_item(tasks, projects);
+    let mut output: Vec<ProjectTableItem> = projects
+        .iter()
+        .map(|project| generate_project_list_item(tasks, project, working_set))
+        .collect();
 
     output.sort_by(|a, b| a.tasks.cmp(&b.tasks));
     for (index, item) in output.into_iter().enumerate() {
@@ -110,7 +126,6 @@ pub fn project_details_table(cfg: &ProjwarriorConfig, project: &Project, tasks: 
         Cell::new(format!("{:?}", &project.state)),
     ]);
 
-    println!("{table}");
     if !tasks.is_empty() {
         task_list_table(cfg, tasks);
     }
@@ -144,24 +159,21 @@ fn task_list_table(cfg: &ProjwarriorConfig, tasks: &[Task]) {
     println!("{table}");
 }
 
-/// Converts the imported JSON `Project` struct to a `ProjectListItem` (the data we wish to display).
-/// Currently attaches the following data:
-/// - Current pending task count
-///
-/// * `tasks`: Parsed task list JSON
-/// * `projects`: Parsed project list JSON
-pub fn generate_project_list(tasks: &[Task], projects: &[Project]) -> Vec<ProjectTableItem> {
-    let result: Vec<ProjectTableItem> = projects
-        .iter()
-        .map(|project| {
-            let count = project.get_tasks(tasks);
-            ProjectTableItem {
-                project: project.clone(),
-                tasks: count,
-            }
-        })
-        .collect();
-    result
+pub fn generate_project_list_item(
+    tasks: &[Task],
+    project: (&Uuid, &taskchampion::Task),
+    working_set: &WorkingSet,
+) -> ProjectTableItem {
+    let (uuid, proj_data) = project;
+    let name = proj_data.get_description().to_string();
+    ProjectTableItem {
+        tasks: get_tasks(&name, tasks),
+        name,
+        uuid: *uuid,
+        status: proj_data.get_status(),
+        entry: proj_data.get_entry(),
+        id: working_set.by_uuid(*uuid),
+    }
 }
 
 fn create_table(headers: &[&str]) -> Table {
@@ -182,4 +194,12 @@ fn determine_proj_color(task_count: usize) -> Color {
     } else {
         Color::Green
     }
+}
+
+pub fn get_tasks(name: &str, tasks: &[Task]) -> i32 {
+    let count = tasks
+        .iter()
+        .filter(|t| t.project() == Some(&name.to_string()))
+        .count();
+    count as i32
 }

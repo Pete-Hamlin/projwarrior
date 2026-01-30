@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::{
     config::{Cli, ProjwarriorConfig, get_config},
     error::ProjChampionError,
+    table::{Column, project_list_table},
     tasks::get_task_list,
 };
 
@@ -50,18 +51,20 @@ impl Projchampion {
     }
 
     pub async fn list_projects(&mut self, _: &Option<String>) -> Result<String, ProjChampionError> {
-        let _ = self.get_tasks()?;
+        let tasks = self.get_tasks()?;
         let projects = self.replica.all_tasks().await?;
-        let proj_len = projects.len();
+        let working_set = self.replica.working_set().await?;
 
-        // let state = match subcommand.as_deref() {
-        //     Some("all") => None,
-        //     Some("incubate") => Some(&State::Incubate),
-        //     Some("done") => Some(&State::Complete),
-        //     _ => Some(&State::Pending),
-        // };
-
-        Ok(format!("Processed {proj_len} projects"))
+        let columns = vec![
+            Column::Id,
+            Column::Uuid,
+            Column::Status,
+            Column::Name,
+            Column::Tasks,
+            Column::Entry,
+        ];
+        project_list_table(&self.conf, &tasks, &projects, &working_set, &columns);
+        Ok("Done.".to_string())
     }
 
     pub async fn count_projects(

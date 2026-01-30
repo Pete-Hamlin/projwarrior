@@ -21,19 +21,21 @@ impl Error for ConfigError {}
 
 #[derive(PartialEq, Debug)]
 pub enum ProjChampionError {
-    ReplicaError(String),
-    TaskError,
-    FileSystemError,
-    OtherError,
+    Replica(String),
+    TaskList,
+    FileSystem,
+    NoProj,
+    Other,
 }
 
 impl fmt::Display for ProjChampionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ProjChampionError::ReplicaError(e) => write!(f, "Unable to setup replica: {e}"),
-            ProjChampionError::TaskError => write!(f, "Error querying taskwarrior"),
-            ProjChampionError::FileSystemError => write!(f, "Filesystem error, check permissions"),
-            ProjChampionError::OtherError => write!(f, "An error has occured"),
+            ProjChampionError::Replica(e) => write!(f, "Unable to setup replica: {e}"),
+            ProjChampionError::TaskList => write!(f, "Error querying taskwarrior"),
+            ProjChampionError::FileSystem => write!(f, "Filesystem error, check permissions"),
+            ProjChampionError::NoProj => write!(f, "No project specified"),
+            ProjChampionError::Other => write!(f, "An error has occured"),
         }
     }
 }
@@ -41,6 +43,6 @@ impl fmt::Display for ProjChampionError {
 impl Error for ProjChampionError {}
 impl From<taskchampion::Error> for ProjChampionError {
     fn from(err: taskchampion::Error) -> Self {
-        Self::ReplicaError(err.to_string())
+        Self::Replica(err.to_string())
     }
 }
