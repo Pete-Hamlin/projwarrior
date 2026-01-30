@@ -148,10 +148,6 @@ impl Projchampion {
         Ok(filtered_projects)
     }
 
-    async fn show_project() -> Result<String, ProjChampionError> {
-        Ok("Done.".to_string())
-    }
-
     async fn init_proj(
         &mut self,
         name: &str,

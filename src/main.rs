@@ -28,14 +28,14 @@ fn main() -> Result<(), String> {
         Err(e) => return Err(format!("Error: Unable to initialize projchampion - {e:?}")),
     };
 
-    match block_on(match_arg(&args, &mut pc)) {
+    match block_on(match_arg(args, &mut pc)) {
         Ok(result) => println!("{result}"),
         Err(e) => println!("Error: {e:?}"),
     };
     Ok(())
 }
 
-async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<String, ProjChampionError> {
+async fn match_arg(args: Cli, pc: &mut Projchampion) -> Result<String, ProjChampionError> {
     match args.command {
         Some(CommandType::Init) => pc.init_projects().await,
         Some(CommandType::Reset) => pc.reset_projects(),
