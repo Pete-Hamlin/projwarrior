@@ -38,7 +38,7 @@ impl FromStr for CommandType {
 
 #[derive(Debug, Clone)]
 pub enum FilterType {
-    ID(u32),
+    ID(usize),
     Uuid(Uuid),
     Filter(String),
 }
@@ -46,7 +46,7 @@ pub enum FilterType {
 impl FromStr for FilterType {
     type Err = String;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        if let Ok(id) = input.parse::<u32>() {
+        if let Ok(id) = input.parse::<usize>() {
             Ok(Self::ID(id))
         } else if let Ok(uuid) = Uuid::parse_str(input) {
             Ok(Self::Uuid(uuid))

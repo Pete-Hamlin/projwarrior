@@ -6,7 +6,7 @@ use taskchampion::{Operations, Replica, SqliteStorage, storage::AccessMode};
 use uuid::Uuid;
 
 use crate::{
-    config::{Cli, ProjwarriorConfig, get_config},
+    config::{Cli, FilterType, ProjwarriorConfig, get_config},
     error::ProjChampionError,
     table::{Column, project_list_table},
     tasks::get_task_list,
@@ -52,7 +52,7 @@ impl Projchampion {
 
     pub async fn list_projects(&mut self, _: &Option<String>) -> Result<String, ProjChampionError> {
         let tasks = self.get_tasks()?;
-        let projects = self.replica.all_tasks().await?;
+        let projects = self.replica.pending_tasks().await?;
         let working_set = self.replica.working_set().await?;
 
         let columns = vec![
@@ -71,7 +71,7 @@ impl Projchampion {
         &mut self,
         _: &Option<String>,
     ) -> Result<String, ProjChampionError> {
-        let _ = self.get_tasks()?;
+        // let _ = self.get_tasks()?;
         let projects = self.replica.all_task_uuids().await?;
         let proj_len = projects.len();
         // TODO: Add filtering
@@ -91,6 +91,65 @@ impl Projchampion {
         } else {
             Err(ProjChampionError::NoProj)
         }
+    }
+
+    pub async fn parse_filter(
+        &mut self,
+        _filter: &FilterType,
+        _subcommand: &Option<String>,
+    ) -> Result<String, ProjChampionError> {
+        let tasks = self.get_tasks()?;
+        let projects = self.replica.pending_tasks().await?;
+        let working_set = self.replica.working_set().await?;
+        let filtered_projects = self
+            .filter_projects(_filter, &projects, &working_set)
+            .await?;
+        let columns = vec![
+            Column::Id,
+            Column::Uuid,
+            Column::Status,
+            Column::Name,
+            Column::Tasks,
+            Column::Entry,
+        ];
+        project_list_table(
+            &self.conf,
+            &tasks,
+            &filtered_projects,
+            &working_set,
+            &columns,
+        );
+        Ok("Done.".to_string())
+    }
+
+    async fn filter_projects(
+        &mut self,
+        filter: &FilterType,
+        projects: &[taskchampion::Task],
+        working_set: &taskchampion::WorkingSet,
+    ) -> Result<Vec<taskchampion::Task>, ProjChampionError> {
+        let filtered_projects: Vec<taskchampion::Task> = match filter {
+            FilterType::ID(id) => projects
+                .iter()
+                .filter(|p| working_set.by_uuid(p.get_uuid()) == Some(*id))
+                .cloned()
+                .collect(),
+            FilterType::Uuid(uuid) => projects
+                .iter()
+                .filter(|p| p.get_uuid() == *uuid)
+                .cloned()
+                .collect(),
+            FilterType::Filter(string) => projects
+                .iter()
+                .filter(|p| p.get_description().contains(string))
+                .cloned()
+                .collect(),
+        };
+        Ok(filtered_projects)
+    }
+
+    async fn show_project() -> Result<String, ProjChampionError> {
+        Ok("Done.".to_string())
     }
 
     async fn init_proj(

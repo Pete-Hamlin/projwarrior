@@ -33,7 +33,6 @@ impl Cache {
     }
 
     fn validate(&self) -> Result<()> {
-        // Add metadata check here
         let metadata = fs::metadata(&self.path)?;
         let now = SystemTime::now();
         let last_updated = metadata.modified()?;

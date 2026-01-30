@@ -8,7 +8,6 @@ use taskchampion::{Status, WorkingSet};
 use uuid::Uuid;
 
 use crate::config::ProjwarriorConfig;
-use crate::error::ProjChampionError;
 use crate::project::Project;
 
 #[derive(Debug)]
@@ -63,7 +62,7 @@ impl Column {
 pub fn project_list_table(
     cfg: &ProjwarriorConfig,
     tasks: &[Task],
-    projects: &HashMap<Uuid, taskchampion::Task>,
+    projects: &Vec<taskchampion::Task>,
     working_set: &WorkingSet,
     columns: &[Column],
 ) {
@@ -161,18 +160,18 @@ fn task_list_table(cfg: &ProjwarriorConfig, tasks: &[Task]) {
 
 pub fn generate_project_list_item(
     tasks: &[Task],
-    project: (&Uuid, &taskchampion::Task),
+    project: &taskchampion::Task,
     working_set: &WorkingSet,
 ) -> ProjectTableItem {
-    let (uuid, proj_data) = project;
-    let name = proj_data.get_description().to_string();
+    let name = project.get_description().to_string();
+    let uuid = project.get_uuid();
     ProjectTableItem {
         tasks: get_tasks(&name, tasks),
+        id: working_set.by_uuid(uuid),
+        status: project.get_status(),
+        entry: project.get_entry(),
         name,
-        uuid: *uuid,
-        status: proj_data.get_status(),
-        entry: proj_data.get_entry(),
-        id: working_set.by_uuid(*uuid),
+        uuid,
     }
 }
 

@@ -42,10 +42,9 @@ async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<String, ProjCham
         Some(CommandType::List) => pc.list_projects(&args.subcommand).await,
         Some(CommandType::Count) => pc.count_projects(&args.subcommand).await,
         Some(CommandType::Add) => pc.add_project(&args.subcommand).await,
-        // Some(CommandType::Query(arg)) => parse_filter(&cfg, &db, &arg, &args.subcommand),
+        Some(CommandType::Query(arg)) => pc.parse_filter(&arg, &args.subcommand).await,
         // Default behaviour - just display list and exit
-        // None => list_projects(&cfg, &db, &args.subcommand),
-        _ => pc.list_projects(&args.subcommand).await,
+        None => pc.list_projects(&args.subcommand).await,
     }
 }
 
@@ -61,9 +60,7 @@ async fn match_arg(args: &Cli, pc: &mut Projchampion) -> Result<String, ProjCham
 //         FilterType::Filter(string) => ProjectFilter::builder().name(string),
 //     };
 //     let query = filters.build();
-
 //     let projects = db.get_projects(&query).unwrap();
-
 //     if projects.len() > 1 {
 //         let tasks = get_task_list(cfg).expect("Failed to get task list");
 //         let projects = match db.get_projects(&query) {
