@@ -59,14 +59,13 @@ impl Column {
 pub fn project_list_table(
     cfg: &ProjwarriorConfig,
     tasks: &[Task],
-    projects: &Vec<taskchampion::Task>,
+    projects: &[taskchampion::Task],
     working_set: &WorkingSet,
     columns: &[Column],
 ) {
     let headers: Vec<&str> = columns.iter().map(|col| col.header()).collect();
     let mut table = create_table(&headers);
 
-    // let mut output = generate_project_list_item(tasks, projects);
     let mut output: Vec<ProjectTableItem> = projects
         .iter()
         .map(|project| generate_project_list_item(tasks, project, working_set))

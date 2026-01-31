@@ -23,9 +23,9 @@ impl Error for ConfigError {}
 pub enum ProjChampionError {
     Replica(String),
     TaskList,
-    FileSystem,
     NoProj,
     SubCommand(String),
+    InvalidUndo,
     Other,
 }
 
@@ -34,9 +34,9 @@ impl fmt::Display for ProjChampionError {
         match self {
             ProjChampionError::Replica(e) => write!(f, "Unable to setup replica: {e}"),
             ProjChampionError::TaskList => write!(f, "Error querying taskwarrior"),
-            ProjChampionError::FileSystem => write!(f, "Filesystem error, check permissions"),
             ProjChampionError::NoProj => write!(f, "No project specified"),
             ProjChampionError::SubCommand(e) => write!(f, "Subcommand {e} not valid."),
+            ProjChampionError::InvalidUndo => write!(f, "Unable to undo last operation."),
             ProjChampionError::Other => write!(f, "An error has occured"),
         }
     }

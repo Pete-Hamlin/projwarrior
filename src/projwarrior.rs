@@ -1,8 +1,6 @@
-use std::fs::remove_file;
-
 use chrono::Utc;
 use task_hookrs::task::Task;
-use taskchampion::{Operations, Replica, SqliteStorage, storage::AccessMode};
+use taskchampion::{Operations, Replica, SqliteStorage, Status, storage::AccessMode};
 use uuid::Uuid;
 
 use crate::{
@@ -36,6 +34,7 @@ impl Projchampion {
         });
         let proj_count = name_list.len();
         let mut ops = Operations::new();
+        ops.push(taskchampion::Operation::UndoPoint);
         for name in name_list {
             self.init_proj(&name, &mut ops).await?;
         }
@@ -43,11 +42,12 @@ impl Projchampion {
         Ok(format!("Successfully initialized {proj_count} projects"))
     }
 
-    pub fn reset_projects(&self) -> Result<String, ProjChampionError> {
-        // TODO: Add confirmation to this action
-        match remove_file(&self.conf.storage_path) {
-            Ok(_) => Ok("Successfully removed project list".to_string()),
-            Err(_) => Err(ProjChampionError::FileSystem),
+    pub async fn undo_last(&mut self) -> Result<String, ProjChampionError> {
+        let ops = self.replica.get_undo_operations().await?;
+        let num_ops = ops.len();
+        match self.replica.commit_reversed_operations(ops).await? {
+            true => Ok(format!("Reverted last {num_ops} operation")),
+            false => Err(ProjChampionError::InvalidUndo),
         }
     }
 
@@ -86,6 +86,7 @@ impl Projchampion {
     ) -> Result<String, ProjChampionError> {
         if let Some(name) = subcommand.as_deref() {
             let mut ops = Operations::new();
+            ops.push(taskchampion::Operation::UndoPoint);
             self.init_proj(name, &mut ops).await?;
             self.replica.commit_operations(ops).await?;
             Ok(format!("Successfully added project {name}"))
@@ -113,8 +114,7 @@ impl Projchampion {
                     match subcommand {
                         "show" => self.show_project(&proj).await?,
                         "done" => self.mark_project_done(&mut proj).await?,
-                        // "pending" => mark_project_pending(db, &project),
-                        // "delete" => delete_project_item(db, &project),
+                        "delete" => self.mark_project_deleted(&mut proj).await?,
                         _ => return Err(ProjChampionError::SubCommand(subcommand.to_string())),
                     };
                 } else {
@@ -206,8 +206,22 @@ impl Projchampion {
         proj: &mut taskchampion::Task,
     ) -> Result<(), ProjChampionError> {
         let mut ops = Operations::new();
+        ops.push(taskchampion::Operation::UndoPoint);
         proj.done(&mut ops)?;
         self.replica.commit_operations(ops).await?;
+        self.replica.rebuild_working_set(false).await?;
+        Ok(())
+    }
+
+    async fn mark_project_deleted(
+        &mut self,
+        proj: &mut taskchampion::Task,
+    ) -> Result<(), ProjChampionError> {
+        let mut ops = Operations::new();
+        ops.push(taskchampion::Operation::UndoPoint);
+        proj.set_status(Status::Deleted, &mut ops)?;
+        self.replica.commit_operations(ops).await?;
+        self.replica.rebuild_working_set(false).await?;
         Ok(())
     }
 }

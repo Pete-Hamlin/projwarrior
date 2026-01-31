@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum CommandType {
-    Init,
-    Reset,
+    Import,
+    Undo,
     List,
     Count,
     Add,
@@ -23,8 +23,8 @@ impl FromStr for CommandType {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input.to_lowercase().as_str() {
-            "init" => Ok(CommandType::Init),
-            "reset" => Ok(CommandType::Reset),
+            "import" => Ok(CommandType::Import),
+            "undo" => Ok(CommandType::Undo),
             "list" => Ok(CommandType::List),
             "count" => Ok(CommandType::Count),
             "add" => Ok(CommandType::Add),
@@ -105,7 +105,7 @@ impl ::std::default::Default for ProjwarriorConfig {
         let task_path = get_task_bin().unwrap();
         let storage_path = PathBuf::from_iter([
             data_dir().unwrap(),
-            PathBuf::from_str("projwarrior/projects.sqlite").unwrap(),
+            PathBuf::from_str("projwarrior/").unwrap(),
         ]);
         Self {
             task_path,
