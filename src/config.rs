@@ -68,10 +68,10 @@ pub struct Cli {
     // #[arg(value_parser = clap::builder::ValueParser::from_str::<CommandType>(), required = false)]
     #[arg(value_parser = clap::value_parser!(CommandType), required = false)]
     pub command: Option<CommandType>,
-    /// Optional subcommand to work on
+    /// Optional subcommand to work on - contextually dependant on command
     pub subcommand: Option<String>,
 
-    /// Display all projects (Override config)
+    /// Display all projects (default only show projects without tasks)
     #[clap(short, long)]
     pub long: bool,
 
