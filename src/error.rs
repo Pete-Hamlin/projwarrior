@@ -25,8 +25,9 @@ pub enum ProjChampionError {
     TaskList,
     NoProj,
     SubCommand(String),
+    Sync(String),
     InvalidUndo,
-    Other,
+    // Other,
 }
 
 impl fmt::Display for ProjChampionError {
@@ -36,8 +37,9 @@ impl fmt::Display for ProjChampionError {
             ProjChampionError::TaskList => write!(f, "Error querying taskwarrior"),
             ProjChampionError::NoProj => write!(f, "No project specified"),
             ProjChampionError::SubCommand(e) => write!(f, "Subcommand {e} not valid."),
+            ProjChampionError::Sync(e) => write!(f, "Unable to sync projects: {e}"),
             ProjChampionError::InvalidUndo => write!(f, "Unable to undo last operation."),
-            ProjChampionError::Other => write!(f, "An error has occured"),
+            // ProjChampionError::Other => write!(f, "An error has occured"),
         }
     }
 }

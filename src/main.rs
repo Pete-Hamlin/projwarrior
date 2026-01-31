@@ -8,19 +8,19 @@ mod tasks;
 
 use clap::Parser;
 use config::{Cli, ProjwarriorConfig};
-use futures::executor::block_on;
 
 use crate::{config::CommandType, error::ProjChampionError, projwarrior::Projchampion};
 
-fn main() -> Result<(), String> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), String> {
     let args = Cli::parse();
 
-    let mut pc = match block_on(Projchampion::new(&args)) {
+    let mut pc = match Projchampion::new(&args).await {
         Ok(pc) => pc,
         Err(e) => return Err(format!("Error: Unable to initialize projchampion - {e:?}")),
     };
 
-    match block_on(match_arg(args, &mut pc)) {
+    match match_arg(args, &mut pc).await {
         Ok(result) => println!("{result}"),
         Err(e) => println!("Error: {e:?}"),
     };
@@ -31,7 +31,9 @@ async fn match_arg(args: Cli, pc: &mut Projchampion) -> Result<String, ProjChamp
     match args.command {
         Some(CommandType::Import) => pc.init_projects().await,
         Some(CommandType::Undo) => pc.undo_last().await,
+        Some(CommandType::Sync) => pc.sync_projects().await,
         Some(CommandType::List) => pc.list_projects(&args.subcommand).await,
+        Some(CommandType::All) => pc.all_projects(&args.subcommand).await,
         Some(CommandType::Count) => pc.count_projects(&args.subcommand).await,
         Some(CommandType::Add) => pc.add_project(&args.subcommand).await,
         Some(CommandType::Query(arg)) => pc.parse_query(&arg, &args.subcommand).await,

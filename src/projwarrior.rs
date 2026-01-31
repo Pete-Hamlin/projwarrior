@@ -1,6 +1,8 @@
+use std::str::FromStr;
+
 use chrono::Utc;
 use task_hookrs::task::Task;
-use taskchampion::{Operations, Replica, SqliteStorage, Status, storage::AccessMode};
+use taskchampion::{Operations, Replica, ServerConfig, SqliteStorage, Status, storage::AccessMode};
 use uuid::Uuid;
 
 use crate::{
@@ -13,6 +15,7 @@ use crate::{
 pub struct Projchampion {
     conf: ProjwarriorConfig,
     replica: Replica<SqliteStorage>,
+    columns: Vec<Column>,
 }
 
 impl Projchampion {
@@ -20,7 +23,20 @@ impl Projchampion {
         let conf = get_config(args);
         let storage = SqliteStorage::new(&conf.storage_path, AccessMode::ReadWrite, true).await?;
         let replica = Replica::new(storage);
-        Ok(Projchampion { conf, replica })
+        let columns = vec![
+            Column::Id,
+            Column::Uuid,
+            Column::Status,
+            Column::Name,
+            Column::Tasks,
+            Column::Entry,
+        ];
+
+        Ok(Projchampion {
+            conf,
+            replica,
+            columns,
+        })
     }
 
     pub async fn init_projects(&mut self) -> Result<String, ProjChampionError> {
@@ -51,21 +67,99 @@ impl Projchampion {
         }
     }
 
-    pub async fn list_projects(&mut self, _: &Option<String>) -> Result<String, ProjChampionError> {
+    pub async fn sync_projects(&mut self) -> Result<String, ProjChampionError> {
+        // Check our server config values are present
+        let url = match &self.conf.sync_url {
+            Some(url) => url.clone(),
+            _ => {
+                return Err(ProjChampionError::Sync(
+                    "Invalid sync server URL.".to_string(),
+                ));
+            }
+        };
+
+        let client_id = match self.conf.sync_client_id {
+            Some(client_id) => client_id,
+            _ => {
+                return Err(ProjChampionError::Sync(
+                    "Invalid sync server client_id.".to_string(),
+                ));
+            }
+        };
+
+        let encryption_secret = match &self.conf.sync_secret {
+            Some(secret) => secret.clone().as_bytes().to_vec(),
+            _ => {
+                return Err(ProjChampionError::Sync(
+                    "Invalid sync server secret.".to_string(),
+                ));
+            }
+        };
+        let server_conf = ServerConfig::Remote {
+            url,
+            client_id,
+            encryption_secret,
+        };
+        let mut server = server_conf.into_server().await?;
+        let changes = self.replica.num_local_operations().await?;
+        self.replica.sync(&mut server, true).await?;
+        Ok(format!("Synced {changes} to server."))
+    }
+
+    pub async fn list_projects(
+        &mut self,
+        subcommand: &Option<String>,
+    ) -> Result<String, ProjChampionError> {
         let tasks = self.get_tasks()?;
-        let projects = self.replica.pending_tasks().await?;
+        let projects: Vec<taskchampion::Task> = match subcommand {
+            Some(subcommand) => {
+                let working_set = self.replica.working_set().await?;
+                let filter = match FilterType::from_str(subcommand.as_str()) {
+                    Ok(filter) => filter,
+                    Err(_) => {
+                        return Err(ProjChampionError::SubCommand(subcommand.to_string()));
+                    }
+                };
+                let all_proj: Vec<taskchampion::Task> = self.replica.pending_tasks().await?;
+                self.filter_projects(&filter, &all_proj, &working_set)
+                    .await?
+            }
+            None => self.replica.pending_tasks().await?,
+        };
         let working_set = self.replica.working_set().await?;
 
-        let columns = vec![
-            Column::Id,
-            Column::Uuid,
-            Column::Status,
-            Column::Name,
-            Column::Tasks,
-            Column::Entry,
-        ];
-        project_list_table(&self.conf, &tasks, &projects, &working_set, &columns);
-        Ok("Done.".to_string())
+        project_list_table(&self.conf, &tasks, &projects, &working_set, &self.columns);
+        let notices = self.get_unsynced_changes().await?;
+        Ok(notices)
+    }
+
+    pub async fn all_projects(
+        &mut self,
+        subcommand: &Option<String>,
+    ) -> Result<String, ProjChampionError> {
+        let tasks = self.get_tasks()?;
+        let projects: Vec<taskchampion::Task> = match subcommand {
+            Some(subcommand) => {
+                let working_set = self.replica.working_set().await?;
+                let filter = match FilterType::from_str(subcommand.as_str()) {
+                    Ok(filter) => filter,
+                    Err(_) => {
+                        return Err(ProjChampionError::SubCommand(subcommand.to_string()));
+                    }
+                };
+                let all_proj: Vec<taskchampion::Task> =
+                    self.replica.all_tasks().await?.values().cloned().collect();
+                self.filter_projects(&filter, &all_proj, &working_set)
+                    .await?
+            }
+            None => self.replica.all_tasks().await?.values().cloned().collect(),
+        };
+
+        let working_set = self.replica.working_set().await?;
+
+        project_list_table(&self.conf, &tasks, &projects, &working_set, &self.columns);
+        let notices = self.get_unsynced_changes().await?;
+        Ok(notices)
     }
 
     pub async fn count_projects(
@@ -89,7 +183,9 @@ impl Projchampion {
             ops.push(taskchampion::Operation::UndoPoint);
             self.init_proj(name, &mut ops).await?;
             self.replica.commit_operations(ops).await?;
-            Ok(format!("Successfully added project {name}"))
+            println!("Successfully added project {name}");
+            let notices = self.get_unsynced_changes().await?;
+            Ok(notices)
         } else {
             Err(ProjChampionError::NoProj)
         }
@@ -123,26 +219,27 @@ impl Projchampion {
                 }
             }
             2.. => {
-                let columns = vec![
-                    Column::Id,
-                    Column::Uuid,
-                    Column::Status,
-                    Column::Name,
-                    Column::Tasks,
-                    Column::Entry,
-                ];
                 project_list_table(
                     &self.conf,
                     &tasks,
                     &filtered_projects,
                     &working_set,
-                    &columns,
+                    &self.columns,
                 );
             }
         };
-        Ok("Done.".to_string())
+        let notices = self.get_unsynced_changes().await?;
+        Ok(notices)
     }
 
+    pub async fn get_unsynced_changes(&mut self) -> Result<String, ProjChampionError> {
+        let changes = self.replica.num_local_operations().await?;
+        let output = match changes {
+            0 => "Up to date.".to_string(),
+            _ => format!("You have {changes} unsynced changes locally."),
+        };
+        Ok(output)
+    }
     async fn filter_projects(
         &mut self,
         filter: &FilterType,

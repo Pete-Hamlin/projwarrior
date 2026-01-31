@@ -12,9 +12,9 @@ use task_hookrs::task::Task;
 pub fn get_task_list(cfg: &ProjwarriorConfig) -> Result<Vec<Task>, Box<dyn Error>> {
     // Try reading from cache if enabled
     if cfg.use_cache
-        && let Some(ref cache) = cfg.cache
+        && let Some(ref task_cache) = cfg.task_cache
     {
-        match cache.read() {
+        match task_cache.read() {
             Ok(tasks) => return Ok(tasks),
             Err(err) => eprintln!("Failed to read cache: {err} — falling back to live export."),
         }
@@ -30,8 +30,8 @@ pub fn get_task_list(cfg: &ProjwarriorConfig) -> Result<Vec<Task>, Box<dyn Error
         .collect();
 
     if cfg.use_cache
-        && let Some(ref cache) = cfg.cache
-        && let Err(err) = cache.write(&filtered_tasks)
+        && let Some(ref task_cache) = cfg.task_cache
+        && let Err(err) = task_cache.write(&filtered_tasks)
     {
         eprintln!("Failed to write to cache: {err}");
     }

@@ -12,6 +12,8 @@ use uuid::Uuid;
 pub enum CommandType {
     Import,
     Undo,
+    Sync,
+    All,
     List,
     Count,
     Add,
@@ -25,6 +27,8 @@ impl FromStr for CommandType {
         match input.to_lowercase().as_str() {
             "import" => Ok(CommandType::Import),
             "undo" => Ok(CommandType::Undo),
+            "sync" => Ok(CommandType::Sync),
+            "all" => Ok(CommandType::All),
             "list" => Ok(CommandType::List),
             "count" => Ok(CommandType::Count),
             "add" => Ok(CommandType::Add),
@@ -97,7 +101,11 @@ pub struct ProjwarriorConfig {
     pub color: bool,
     pub use_cache: bool,
     pub cache_length: u64,
-    pub cache: Option<Cache>,
+    pub task_cache: Option<Cache>,
+
+    pub sync_url: Option<String>,
+    pub sync_client_id: Option<Uuid>,
+    pub sync_secret: Option<String>,
 }
 
 impl ::std::default::Default for ProjwarriorConfig {
@@ -114,7 +122,11 @@ impl ::std::default::Default for ProjwarriorConfig {
             color: true,
             use_cache: true,
             cache_length: 60,
-            cache: None,
+            task_cache: None,
+
+            sync_url: None,
+            sync_client_id: None,
+            sync_secret: None,
         }
     }
 }
@@ -142,14 +154,14 @@ pub fn get_config(args: &Cli) -> ProjwarriorConfig {
         true => Cache::new(cfg.cache_length, dirs::cache_dir(), args.refresh),
         false => None,
     };
-    // Overwrite config file with CLI options
+    // Overwrite relevant config file options with CLI args
     ProjwarriorConfig {
         short: if args.short || args.long {
             !args.long
         } else {
             cfg.short
         },
-        cache: if args.no_cache { None } else { cache },
+        task_cache: if args.no_cache { None } else { cache },
         color: if args.color { true } else { cfg.color },
         ..cfg
     }
