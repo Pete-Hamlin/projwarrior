@@ -184,13 +184,28 @@ impl Projchampion {
         subcommand: &Option<String>,
     ) -> Result<String, ProjChampionError> {
         if let Some(name) = subcommand.as_deref() {
-            let mut ops = Operations::new();
-            ops.push(taskchampion::Operation::UndoPoint);
-            self.init_proj(name, &mut ops).await?;
-            self.replica.commit_operations(ops).await?;
-            println!("Successfully added project {name}");
-            let notices = self.get_notices().await?;
-            Ok(notices)
+            let projects = self.replica.pending_tasks().await?;
+            let working_set = self.replica.working_set().await?;
+            match self
+                .filter_projects(
+                    &FilterType::Filter(name.to_string()),
+                    &projects,
+                    &working_set,
+                )
+                .await?
+                .len()
+            {
+                0 => {
+                    let mut ops = Operations::new();
+                    ops.push(taskchampion::Operation::UndoPoint);
+                    self.init_proj(name, &mut ops).await?;
+                    self.replica.commit_operations(ops).await?;
+                    println!("Successfully added project {name}");
+                    let notices = self.get_notices().await?;
+                    Ok(notices)
+                }
+                _ => Ok(format!("Project {name} already exists - skipping.")),
+            }
         } else {
             Err(ProjChampionError::NoProj)
         }
