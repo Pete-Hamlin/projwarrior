@@ -68,6 +68,11 @@ impl Projchampion {
     }
 
     pub async fn sync_projects(&mut self) -> Result<String, ProjChampionError> {
+        if !self.conf.sync {
+            return Err(ProjChampionError::Sync(
+                "Sync disabled in projwarrior config.".to_string(),
+            ));
+        }
         // Check our server config values are present
         let url = match &self.conf.sync_url {
             Some(url) => url.clone(),
@@ -129,7 +134,7 @@ impl Projchampion {
         let working_set = self.replica.working_set().await?;
 
         project_list_table(&self.conf, &tasks, &projects, &working_set, &self.columns);
-        let notices = self.get_unsynced_changes().await?;
+        let notices = self.get_notices().await?;
         Ok(notices)
     }
 
@@ -158,7 +163,7 @@ impl Projchampion {
         let working_set = self.replica.working_set().await?;
 
         project_list_table(&self.conf, &tasks, &projects, &working_set, &self.columns);
-        let notices = self.get_unsynced_changes().await?;
+        let notices = self.get_notices().await?;
         Ok(notices)
     }
 
@@ -184,7 +189,7 @@ impl Projchampion {
             self.init_proj(name, &mut ops).await?;
             self.replica.commit_operations(ops).await?;
             println!("Successfully added project {name}");
-            let notices = self.get_unsynced_changes().await?;
+            let notices = self.get_notices().await?;
             Ok(notices)
         } else {
             Err(ProjChampionError::NoProj)
@@ -228,8 +233,16 @@ impl Projchampion {
                 );
             }
         };
-        let notices = self.get_unsynced_changes().await?;
+        let notices = self.get_notices().await?;
         Ok(notices)
+    }
+
+    pub async fn get_notices(&mut self) -> Result<String, ProjChampionError> {
+        let output = match self.conf.sync {
+            false => "Done.".to_string(),
+            true => self.get_unsynced_changes().await?,
+        };
+        Ok(output)
     }
 
     pub async fn get_unsynced_changes(&mut self) -> Result<String, ProjChampionError> {

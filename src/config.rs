@@ -103,6 +103,7 @@ pub struct ProjwarriorConfig {
     pub cache_length: u64,
     pub task_cache: Option<Cache>,
 
+    pub sync: bool,
     pub sync_url: Option<String>,
     pub sync_client_id: Option<Uuid>,
     pub sync_secret: Option<String>,
@@ -124,6 +125,7 @@ impl ::std::default::Default for ProjwarriorConfig {
             cache_length: 60,
             task_cache: None,
 
+            sync: true,
             sync_url: None,
             sync_client_id: None,
             sync_secret: None,
