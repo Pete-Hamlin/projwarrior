@@ -320,6 +320,7 @@ impl Projchampion {
         proj.done(&mut ops)?;
         self.replica.commit_operations(ops).await?;
         self.replica.rebuild_working_set(false).await?;
+        println!("Marked project {} done!", proj.get_description());
         Ok(())
     }
 
@@ -332,6 +333,7 @@ impl Projchampion {
         proj.set_status(Status::Deleted, &mut ops)?;
         self.replica.commit_operations(ops).await?;
         self.replica.rebuild_working_set(false).await?;
+        println!("Deleted project {}!", proj.get_description());
         Ok(())
     }
 }
