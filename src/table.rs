@@ -1,21 +1,9 @@
-use chrono::{DateTime, Utc};
 use comfy_table::presets::NOTHING;
 use comfy_table::{Attribute, Cell, Color, Table};
 use task_hookrs::task::Task;
-use taskchampion::{Status, WorkingSet};
-use uuid::Uuid;
 
 use crate::config::ProjwarriorConfig;
-
-#[derive(Debug)]
-pub struct ProjectTableItem {
-    pub name: String,
-    pub id: Option<usize>,
-    pub uuid: Uuid,
-    pub status: Status,
-    pub tasks: i32,
-    pub entry: Option<DateTime<Utc>>,
-}
+use crate::project_table_item::ProjectTableItem;
 
 pub enum Column {
     Id,
@@ -58,21 +46,13 @@ impl Column {
 
 pub fn project_list_table(
     cfg: &ProjwarriorConfig,
-    tasks: &[Task],
-    projects: &[taskchampion::Task],
-    working_set: &WorkingSet,
+    projects: &[ProjectTableItem],
     columns: &[Column],
 ) {
     let headers: Vec<&str> = columns.iter().map(|col| col.header()).collect();
     let mut table = create_table(&headers);
 
-    let mut output: Vec<ProjectTableItem> = projects
-        .iter()
-        .map(|project| generate_project_list_item(tasks, project, working_set))
-        .collect();
-
-    output.sort_by(|a, b| a.tasks.cmp(&b.tasks));
-    for (index, item) in output.into_iter().enumerate() {
+    for (index, item) in projects.iter().enumerate() {
         // Set colors
         let color = if cfg.color {
             determine_proj_color(item.tasks as usize)
@@ -85,14 +65,12 @@ pub fn project_list_table(
             Color::Reset
         };
 
-        if !cfg.short || item.tasks == 0 {
-            let rows: Vec<Cell> = columns
-                .iter()
-                .map(|col| Cell::new(col.row(&item)).fg(color).bg(bg_color))
-                .collect();
+        let rows: Vec<Cell> = columns
+            .iter()
+            .map(|col| Cell::new(col.row(item)).fg(color).bg(bg_color))
+            .collect();
 
-            table.add_row(rows);
-        }
+        table.add_row(rows);
     }
     if table.row_count() > 0 {
         println!("{table}");
@@ -163,23 +141,6 @@ fn task_list_table(cfg: &ProjwarriorConfig, tasks: &[Task]) {
     println!("{table}");
 }
 
-pub fn generate_project_list_item(
-    tasks: &[Task],
-    project: &taskchampion::Task,
-    working_set: &WorkingSet,
-) -> ProjectTableItem {
-    let name = project.get_description().to_string();
-    let uuid = project.get_uuid();
-    ProjectTableItem {
-        tasks: get_tasks(&name, tasks),
-        id: working_set.by_uuid(uuid),
-        status: project.get_status(),
-        entry: project.get_entry(),
-        name,
-        uuid,
-    }
-}
-
 fn create_table(headers: &[&str]) -> Table {
     let mut table = Table::new();
     table.load_preset(NOTHING);
@@ -198,12 +159,4 @@ fn determine_proj_color(task_count: usize) -> Color {
     } else {
         Color::Green
     }
-}
-
-pub fn get_tasks(name: &str, tasks: &[Task]) -> i32 {
-    let count = tasks
-        .iter()
-        .filter(|t| t.project() == Some(&name.to_string()))
-        .count();
-    count as i32
 }

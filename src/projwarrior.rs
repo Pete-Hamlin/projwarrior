@@ -8,6 +8,7 @@ use uuid::Uuid;
 use crate::{
     config::{Cli, FilterType, ProjwarriorConfig, get_config},
     error::ProjChampionError,
+    project_table_item::ProjectTableItem,
     table::{Column, project_details_table, project_list_table},
     tasks::get_task_list,
 };
@@ -132,8 +133,8 @@ impl Projchampion {
             None => self.replica.pending_tasks().await?,
         };
         let working_set = self.replica.working_set().await?;
-
-        project_list_table(&self.conf, &tasks, &projects, &working_set, &self.columns);
+        let table_list = self.table_list(&projects, &tasks, &working_set);
+        project_list_table(&self.conf, &table_list, &self.columns);
         let notices = self.get_notices().await?;
         Ok(notices)
     }
@@ -162,7 +163,8 @@ impl Projchampion {
 
         let working_set = self.replica.working_set().await?;
 
-        project_list_table(&self.conf, &tasks, &projects, &working_set, &self.columns);
+        let table_list = self.table_list(&projects, &tasks, &working_set);
+        project_list_table(&self.conf, &table_list, &self.columns);
         let notices = self.get_notices().await?;
         Ok(notices)
     }
@@ -192,7 +194,12 @@ impl Projchampion {
                         .len()
                 }
             },
-            None => self.replica.pending_tasks().await?.len(),
+            None => {
+                let projects = self.replica.pending_tasks().await?;
+                let working_set = self.replica.working_set().await?;
+                let tasks = self.get_tasks()?;
+                self.table_list(&projects, &tasks, &working_set).len()
+            }
         };
         Ok(format!("{proj_len}"))
     }
@@ -257,13 +264,8 @@ impl Projchampion {
                 }
             }
             2.. => {
-                project_list_table(
-                    &self.conf,
-                    &tasks,
-                    &filtered_projects,
-                    &working_set,
-                    &self.columns,
-                );
+                let table_list = self.table_list(&projects, &tasks, &working_set);
+                project_list_table(&self.conf, &table_list, &self.columns);
             }
         };
         let notices = self.get_notices().await?;
@@ -286,6 +288,28 @@ impl Projchampion {
         };
         Ok(output)
     }
+
+    fn table_list(
+        &mut self,
+        projects: &[taskchampion::Task],
+        tasks: &[Task],
+        working_set: &taskchampion::WorkingSet,
+    ) -> Vec<ProjectTableItem> {
+        let mut table_list: Vec<ProjectTableItem> = projects
+            .iter()
+            .map(|project| ProjectTableItem::from_project(project, tasks, working_set))
+            .collect();
+        table_list.sort_by(|a, b| a.tasks.cmp(&b.tasks));
+        if self.conf.short {
+            table_list
+                .into_iter()
+                .filter(|item| item.tasks == 0)
+                .collect()
+        } else {
+            table_list
+        }
+    }
+
     async fn filter_projects(
         &mut self,
         filter: &FilterType,

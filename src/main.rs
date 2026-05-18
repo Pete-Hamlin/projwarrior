@@ -2,6 +2,7 @@
 mod cache;
 mod config;
 mod error;
+mod project_table_item;
 mod projwarrior;
 mod table;
 mod tasks;
