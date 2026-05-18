@@ -169,13 +169,31 @@ impl Projchampion {
 
     pub async fn count_projects(
         &mut self,
-        _: &Option<String>,
+        subcommand: &Option<String>,
     ) -> Result<String, ProjChampionError> {
         // let _ = self.get_tasks()?;
-        let projects = self.replica.all_task_uuids().await?;
-        let proj_len = projects.len();
-        // TODO: Add filtering
-
+        let proj_len = match subcommand.as_deref() {
+            Some(filter) => match filter {
+                "all" => {
+                    let projects = self.replica.all_task_uuids().await?;
+                    projects.len()
+                }
+                _ => {
+                    let fl = match FilterType::from_str(filter) {
+                        Ok(fl) => fl,
+                        Err(_) => {
+                            return Err(ProjChampionError::SubCommand(filter.to_string()));
+                        }
+                    };
+                    let projects = self.replica.pending_tasks().await?;
+                    let working_set = self.replica.working_set().await?;
+                    self.filter_projects(&fl, &projects, &working_set)
+                        .await?
+                        .len()
+                }
+            },
+            None => self.replica.pending_tasks().await?.len(),
+        };
         Ok(format!("{proj_len}"))
     }
 
