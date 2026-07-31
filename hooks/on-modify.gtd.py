@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 _ = json.loads(sys.stdin.readline())
 new_task = json.loads(sys.stdin.readline())
@@ -10,8 +11,14 @@ msg = ""
 
 if "project" in new_task:
     msg = subprocess.run(
-        ["proj", "add", new_task["project"]], check=True, stdout=subprocess.PIPE, universal_newlines=True
+        ["proj", "add", new_task["project"]],
+        check=True,
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
     )
+    # Clear cache
+    cache_dir = Path().home() / ".cache" / "projwarrior" / "tasks.json"
+    cache_dir.unlink(missing_ok=True)
 
 print(json.dumps(new_task))
 if msg:
